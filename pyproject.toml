@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "f1-forecast"
+version = "0.0.1"
+description = "Unofficial fan project: data-driven predictions for the 2027 F1 season. Not affiliated with Formula 1."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Bharat Challakonda" }]
+dependencies = [
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    # Keep in sync with .pre-commit-config.yaml so local hooks and CI format identically.
+    "ruff==0.17.5",
+    "black==26.10.1",
+    "pre-commit>=3.8",
+]
+# Added in Phase 1+ (kept out until needed so CI stays fast)
+# ingest = ["requests", "tenacity", "fastf1", "polars", "pyarrow"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/f1_forecast"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "N"]
+
+[tool.ruff.lint.per-file-ignores]
+# Databricks notebooks get `spark` and `dbutils` injected at runtime.
+"databricks/**/*.py" = ["F821", "E402", "N999"]

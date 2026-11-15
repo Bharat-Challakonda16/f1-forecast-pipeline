@@ -1,0 +1,21 @@
+# Phase 0 smoke job: create the catalog/schemas, then idempotently MERGE a tiny Delta table.
+# No compute block: on Databricks Free Edition, notebook tasks run on serverless.
+resources:
+  jobs:
+    hello_delta:
+      name: f1_forecast_hello_delta
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: setup_catalog
+          notebook_task:
+            notebook_path: ../notebooks/00_setup_catalog.py
+            base_parameters:
+              catalog: ${var.catalog}
+
+        - task_key: write_hello
+          depends_on:
+            - task_key: setup_catalog
+          notebook_task:
+            notebook_path: ../notebooks/01_hello_delta.py
+            base_parameters:
+              catalog: ${var.catalog}

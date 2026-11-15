@@ -1,0 +1,27 @@
+# Databricks Asset Bundle for the F1 Forecast Pipeline.
+#
+# The workspace host and credentials are NOT stored here (this repo is public).
+# They come from the project-local, gitignored ../.databrickscfg
+# (profile "f1forecast"), which scripts/dbx.cmd selects automatically.
+#
+# Usage (from the repo root):
+#   scripts\dbx.cmd bundle validate
+#   scripts\dbx.cmd bundle deploy
+#   scripts\dbx.cmd bundle run hello_delta
+#   scripts\dbx.cmd bundle run hello_delta --var catalog=workspace   # if catalog creation is blocked
+
+bundle:
+  name: f1_forecast
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog holding the bronze/silver/gold schemas
+    default: f1_forecast
+
+targets:
+  dev:
+    mode: development
+    default: true

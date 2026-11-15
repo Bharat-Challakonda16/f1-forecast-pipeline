@@ -1,0 +1,38 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+.databrickscfg
+
+# Project-local tools (Databricks CLI binary)
+.tools/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local data caches (never commit downloaded data)
+data/
+*.parquet
+
+# Databricks bundle state
+.databricks/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Front end (later phases)
+node_modules/
+web/dist/

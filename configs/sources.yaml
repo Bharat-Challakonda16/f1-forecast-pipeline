@@ -1,0 +1,86 @@
+# External data sources (brief section 4).
+# Endpoints and limits are best-known values as of Nov 2026.
+# Anything with `verify: true` must be checked against live docs before Phase 1 relies on it.
+#
+# Pipeline rule: cache every response locally; never re-download data we already have.
+
+defaults:
+  user_agent: "f1-forecast-pipeline/0.0.1 (unofficial non-commercial fan project)"
+  timeout_s: 30
+  retries:
+    max_attempts: 5
+    backoff_initial_s: 1.0
+    backoff_max_s: 60.0
+    retry_on_status: [429, 500, 502, 503, 504]
+
+sources:
+  jolpica:
+    description: "Ergast successor: results, qualifying, grids, standings, laps, pit stops, circuits, schedule"
+    base_url: "https://api.jolpi.ca/ergast/f1/"
+    format: json
+    auth: none
+    page_size_max: 100       # verify
+    rate_limit:
+      burst_per_second: 4    # verify
+      sustained_per_hour: 500  # verify
+    coverage:
+      results: 1950
+      lap_times: 1996        # verify
+      pit_stops: 2011        # verify
+    project_range: [2001, 2026]
+    docs: "https://github.com/jolpica/jolpica-f1"
+    verify: true
+
+  fastf1:
+    description: "Python library: laps, tyre stints, telemetry, position data, session weather"
+    kind: python_library
+    package: fastf1
+    cache_dir_env: FASTF1_CACHE_DIR
+    coverage_from: 2018
+    rate_limit:
+      note: "FastF1 applies its own internal limits; always keep the disk cache enabled"
+    docs: "https://docs.fastf1.dev/"
+    verify: true
+
+  openf1:
+    description: "Session data, race control messages (historical only in v1)"
+    base_url: "https://api.openf1.org/v1/"
+    format: json
+    auth: none
+    coverage_from: 2023
+    realtime: false          # real-time access is paid; not used in v1
+    docs: "https://openf1.org/"
+    verify: true
+
+  open_meteo:
+    description: "Weather: archive (climate base rates), seasonal outlook, 16-day hourly forecast"
+    license: "Free for non-commercial use; CC BY 4.0 attribution required"
+    auth: none
+    endpoints:
+      archive: "https://archive-api.open-meteo.com/v1/archive"
+      forecast: "https://api.open-meteo.com/v1/forecast"
+      seasonal: "https://seasonal-api.open-meteo.com/v1/seasonal"  # verify
+    forecast_horizon_days: 16
+    rate_limit:
+      per_minute: 600        # verify
+      per_hour: 5000         # verify
+      per_day: 10000         # verify
+    docs: "https://open-meteo.com/en/docs"
+    verify: true
+
+  gdelt:
+    description: "News discovery (Phase 6). Store headline/link/source/date/short summary only."
+    base_url: "https://api.gdeltproject.org/api/v2/doc/doc"
+    auth: none
+    enabled: false
+    verify: true
+
+  rss:
+    description: "F1 news feeds (Phase 6). Never store full article text."
+    enabled: false
+    feeds: []                # curated in Phase 6; each entry: {name, url, credibility_prior}
+    verify: true
+
+  manual:
+    description: "Hand-curated circuit metadata (track type, overtaking difficulty, pit-lane loss)"
+    seed_file: "configs/circuits_seed.csv"   # created in Phase 1
