@@ -38,7 +38,7 @@ Pipelines are incremental and idempotent (Delta `MERGE` on natural keys). Every 
 
 ## Phase checklist
 
-- [ ] **0. Setup:** repo, tooling, CI, Databricks catalog/schemas, hello Delta job
+- [x] **0. Setup:** repo, tooling, CI, Databricks catalog/schemas, hello Delta job
 - [ ] **1. Data pipeline:** Jolpica, FastF1, Open-Meteo archive, 2027 calendar, circuits seed; bronze → silver; DQ checks
 - [ ] **2. Features:** driver traits, car profiles, tyre models, incident rates, pace trends
 - [ ] **3. Simulator:** qualifying model, vectorized race sim, season aggregator, 2026 backtest
