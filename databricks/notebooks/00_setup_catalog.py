@@ -34,4 +34,9 @@ spark.sql(
     "COMMENT 'Raw files exactly as downloaded from external sources'"
 )
 
-print(f"Ready: {catalog}.bronze / silver / gold and /Volumes/{catalog}/bronze/landing")
+spark.sql(
+    f"CREATE VOLUME IF NOT EXISTS `{catalog}`.`bronze`.`checkpoints` "
+    "COMMENT 'Auto Loader checkpoints and inferred schemas'"
+)
+
+print(f"Ready: {catalog}.bronze / silver / gold, volumes landing + checkpoints")

@@ -129,7 +129,7 @@ def test_second_request_served_from_cache(tmp_path):
     assert client.get_json("https://x/a.json") == {"a": 1}
     assert client.get_json("https://x/a.json") == {"a": 1}
     assert len(session.calls) == 1
-    assert client.stats == {"cache_hits": 1, "downloads": 1, "retries": 0}
+    assert client.stats == {"cache_hits": 1, "downloads": 1, "retries": 0, "requests": 1}
 
 
 def test_cache_survives_new_client(tmp_path):

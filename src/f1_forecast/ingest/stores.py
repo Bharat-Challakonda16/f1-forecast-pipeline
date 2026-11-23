@@ -58,6 +58,15 @@ class VolumeStore:
         # The Files API creates parent directories and replaces the file in one call.
         self.client.files.upload(self._path(key), io.BytesIO(data), overwrite=True)
 
+    def list_names(self, prefix: str) -> list[str]:
+        from databricks.sdk.errors import NotFound
+
+        try:
+            entries = self.client.files.list_directory_contents(self._path(prefix))
+            return sorted(e.name for e in entries if not e.is_directory)
+        except NotFound:
+            return []
+
 
 def make_store(kind: str, location: str) -> Store:
     if kind == "local":

@@ -1,0 +1,58 @@
+name: Ingest OpenF1
+
+# Lands OpenF1 sessions (2023+) in the Databricks landing Volume, then loads bronze.
+# The first backfill takes ~15 hours, so each run works for up to 5.5 hours and stops
+# cleanly; the next run continues. Once caught up, runs take a minute or two.
+on:
+  workflow_dispatch:
+    inputs:
+      max_minutes:
+        description: "Stop landing after this many minutes"
+        default: "330"
+  schedule:
+    # Every 6 hours: finishes the backfill within a day, then picks up each session
+    # (practice, qualifying, race) a few hours after it ends.
+    - cron: "15 */6 * * *"
+
+concurrency:
+  group: ingest-openf1
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      LANDING: /Volumes/f1_forecast/bronze/landing
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install .
+
+      - name: Check secrets
+        run: |
+          if [ -z "$DATABRICKS_HOST" ] || [ -z "$DATABRICKS_TOKEN" ]; then
+            echo "::error::Add DATABRICKS_HOST and DATABRICKS_TOKEN as repository secrets."
+            exit 1
+          fi
+
+      - name: Land sessions
+        id: land
+        run: >
+          python -m f1_forecast.ingest.openf1 --store volume --location "$LANDING"
+          --max-minutes "${{ inputs.max_minutes || '330' }}"
+
+      - name: Load bronze tables
+        if: steps.land.outputs.landed != '0'
+        run: python -m f1_forecast.ops.run_job f1_forecast_openf1_bronze --timeout-min 120

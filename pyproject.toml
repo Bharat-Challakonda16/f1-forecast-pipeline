@@ -14,6 +14,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "requests>=2.32",
     "databricks-sdk>=0.40",
+    "pyarrow>=17",
 ]
 
 [project.optional-dependencies]

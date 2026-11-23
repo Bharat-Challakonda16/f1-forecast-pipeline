@@ -83,6 +83,7 @@ class Store(Protocol):
     def exists(self, key: str) -> bool: ...
     def read(self, key: str) -> bytes: ...
     def write(self, key: str, data: bytes) -> None: ...
+    def list_names(self, prefix: str) -> list[str]: ...
 
 
 @dataclass
@@ -91,6 +92,13 @@ class LocalStore:
 
     def _path(self, key: str) -> Path:
         return self.root / key
+
+    def list_names(self, prefix: str) -> list[str]:
+        """File names directly inside the folder ``prefix`` (empty if it doesn't exist)."""
+        folder = self._path(prefix)
+        if not folder.is_dir():
+            return []
+        return sorted(p.name for p in folder.iterdir() if p.is_file())
 
     def exists(self, key: str) -> bool:
         return self._path(key).is_file()
@@ -120,7 +128,9 @@ def cache_key(source: str, url: str, params: Mapping[str, Any] | None = None) ->
 
 
 class DownloadError(RuntimeError):
-    pass
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 @dataclass
@@ -211,6 +221,7 @@ class CachedClient:
         last_error = ""
         for attempt in range(1, self.retry.max_attempts + 1):
             self.limiter.acquire()
+            self.stats["requests"] = self.stats.get("requests", 0) + 1
             try:
                 resp = self.session.get(url, params=params, timeout=self.timeout_s)
             except (requests.ConnectionError, requests.Timeout) as exc:
@@ -219,7 +230,10 @@ class CachedClient:
                 if resp.status_code == 200:
                     return resp.content
                 if resp.status_code not in self.retry.retry_on_status:
-                    raise DownloadError(f"{self.source}: HTTP {resp.status_code} for {resp.url}")
+                    raise DownloadError(
+                        f"{self.source}: HTTP {resp.status_code} for {resp.url}",
+                        status=resp.status_code,
+                    )
                 last_error = f"HTTP {resp.status_code}"
                 retry_after = resp.headers.get("Retry-After")
             if attempt == self.retry.max_attempts:
