@@ -2,13 +2,30 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_DIR = REPO_ROOT / "configs"
+
+
+def _find_config_dir() -> Path:
+    """``$F1F_CONFIG_DIR``, else the repo's ``configs/`` (editable install), else ``./configs``.
+
+    A regular (non-editable) install puts the package in site-packages, away from the repo,
+    so CI falls back to the checkout's ``configs/`` in the working directory.
+    """
+    if env := os.environ.get("F1F_CONFIG_DIR"):
+        return Path(env)
+    repo_configs = REPO_ROOT / "configs"
+    if repo_configs.is_dir():
+        return repo_configs
+    return Path.cwd() / "configs"
+
+
+CONFIG_DIR = _find_config_dir()
 
 
 def load_yaml(name: str, config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
