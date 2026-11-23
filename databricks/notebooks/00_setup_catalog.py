@@ -28,4 +28,10 @@ if catalog not in existing:
 for schema in ("bronze", "silver", "gold"):
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS `{catalog}`.`{schema}`")
 
-print(f"Ready: {catalog}.bronze / {catalog}.silver / {catalog}.gold")
+# Landing zone for raw downloaded files (written by GitHub Actions via the Files API).
+spark.sql(
+    f"CREATE VOLUME IF NOT EXISTS `{catalog}`.`bronze`.`landing` "
+    "COMMENT 'Raw files exactly as downloaded from external sources'"
+)
+
+print(f"Ready: {catalog}.bronze / silver / gold and /Volumes/{catalog}/bronze/landing")

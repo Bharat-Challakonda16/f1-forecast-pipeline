@@ -166,20 +166,48 @@ class CachedClient:
         self.session.headers["User-Agent"] = self.user_agent
         self.stats = {"cache_hits": 0, "downloads": 0, "retries": 0}
 
-    def get_bytes(self, url: str, params: Mapping[str, Any] | None = None) -> bytes:
-        key = cache_key(self.source, url, params)
+    def get_bytes(
+        self,
+        url: str,
+        params: Mapping[str, Any] | None = None,
+        *,
+        key: str | None = None,
+        accept: Callable[[bytes], bool] | None = None,
+    ) -> bytes | None:
+        """Return the response body, from the store if we already have it.
+
+        ``key`` overrides the hashed cache key with a readable landing path.
+        ``accept`` decides whether a fresh response is complete enough to keep. Rejected
+        responses are returned as ``None`` and not stored, so they are fetched again on the
+        next run (e.g. a race whose results are not published yet).
+        """
+        key = key or cache_key(self.source, url, params)
         if self.store.exists(key):
             self.stats["cache_hits"] += 1
             return self.store.read(key)
-        data = self._fetch(url, params)
+        data = self.fetch(url, params)
+        if accept is not None and not accept(data):
+            self.stats["rejected"] = self.stats.get("rejected", 0) + 1
+            return None
         self.store.write(key, data)
         self.stats["downloads"] += 1
         return data
 
-    def get_json(self, url: str, params: Mapping[str, Any] | None = None) -> Any:
-        return json.loads(self.get_bytes(url, params))
+    def get_json(
+        self,
+        url: str,
+        params: Mapping[str, Any] | None = None,
+        *,
+        key: str | None = None,
+        accept: Callable[[Any], bool] | None = None,
+    ) -> Any:
+        """Like :meth:`get_bytes` but parsed; ``accept`` receives the parsed JSON."""
+        accept_bytes = (lambda b: accept(json.loads(b))) if accept else None
+        data = self.get_bytes(url, params, key=key, accept=accept_bytes)
+        return None if data is None else json.loads(data)
 
-    def _fetch(self, url: str, params: Mapping[str, Any] | None) -> bytes:
+    def fetch(self, url: str, params: Mapping[str, Any] | None = None) -> bytes:
+        """Download without touching the store (rate limits and retries still apply)."""
         last_error = ""
         for attempt in range(1, self.retry.max_attempts + 1):
             self.limiter.acquire()

@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
     "requests>=2.32",
+    "databricks-sdk>=0.40",
 ]
 
 [project.optional-dependencies]
@@ -48,4 +49,5 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "N"]
 
 [tool.ruff.lint.per-file-ignores]
 # Databricks notebooks get `spark` and `dbutils` injected at runtime.
-"databricks/**/*.py" = ["F821", "E402", "N999"]
+# Markdown cells can be long; `functions as F` is the standard PySpark alias.
+"databricks/**/*.py" = ["F821", "E402", "N999", "E501", "N812"]

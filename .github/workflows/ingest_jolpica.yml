@@ -1,0 +1,48 @@
+name: Ingest Jolpica
+
+# Lands new Jolpica data in the Databricks landing Volume, then loads it into bronze.
+# Re-running is always safe: anything already landed is skipped.
+on:
+  workflow_dispatch:
+  schedule:
+    # Monday and Tuesday 06:00 UTC: after race weekends (Tuesday catches late publishing).
+    - cron: "0 6 * * 1,2"
+
+concurrency:
+  group: ingest-jolpica
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      LANDING: /Volumes/f1_forecast/bronze/landing
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install .
+
+      - name: Check secrets
+        run: |
+          if [ -z "$DATABRICKS_HOST" ] || [ -z "$DATABRICKS_TOKEN" ]; then
+            echo "::error::Add DATABRICKS_HOST and DATABRICKS_TOKEN as repository secrets."
+            exit 1
+          fi
+
+      - name: Land files (dump + new rounds)
+        run: python -m f1_forecast.ingest.jolpica --store volume --location "$LANDING"
+
+      - name: Load bronze tables
+        run: python -m f1_forecast.ops.run_job f1_forecast_jolpica_bronze
