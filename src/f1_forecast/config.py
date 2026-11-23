@@ -26,6 +26,11 @@ def load_sources(config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
     return load_yaml("sources.yaml", config_dir)["sources"]
 
 
+def load_source_defaults(config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
+    """Return the shared ``defaults`` (user agent, timeout, retries) from ``sources.yaml``."""
+    return load_yaml("sources.yaml", config_dir).get("defaults", {})
+
+
 def unverified_sources(config_dir: Path = CONFIG_DIR) -> list[str]:
     """Names of sources whose endpoints or limits still need checking against live docs."""
     return [name for name, cfg in load_sources(config_dir).items() if cfg.get("verify")]

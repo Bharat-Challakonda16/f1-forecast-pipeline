@@ -24,9 +24,9 @@ def test_http_sources_have_https_urls():
             assert url.startswith("https://"), f"{name}: {url}"
 
 
-def test_unverified_sources_flagged():
-    # Phase 1 must clear these flags after checking live docs.
-    assert "jolpica" in unverified_sources()
+def test_only_later_phase_sources_remain_unverified():
+    # Phase 1 sources were checked against live docs on 2026-11-15.
+    assert set(unverified_sources()) == {"gdelt", "rss"}
 
 
 def test_load_yaml_rejects_non_mapping(tmp_path: Path):

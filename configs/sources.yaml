@@ -1,56 +1,71 @@
-# External data sources (brief section 4).
-# Endpoints and limits are best-known values as of Nov 2026.
-# Anything with `verify: true` must be checked against live docs before Phase 1 relies on it.
+# External data sources.
+# Limits below were checked against live docs/headers on 2026-11-15 unless marked `verify`.
 #
-# Pipeline rule: cache every response locally; never re-download data we already have.
+# Pipeline rules: cache every response; never re-download data we already have;
+# respect every rate limit (we stay a little under the published numbers).
 
 defaults:
-  user_agent: "f1-forecast-pipeline/0.0.1 (unofficial non-commercial fan project)"
-  timeout_s: 30
+  user_agent: "f1-forecast-pipeline/0.1 (unofficial non-commercial fan project)"
+  timeout_s: 60
   retries:
     max_attempts: 5
-    backoff_initial_s: 1.0
-    backoff_max_s: 60.0
+    backoff_initial_s: 2.0
+    backoff_max_s: 120.0
     retry_on_status: [429, 500, 502, 503, 504]
 
 sources:
   jolpica:
-    description: "Ergast successor: results, qualifying, grids, standings, laps, pit stops, circuits, schedule"
+    description: "Ergast successor: results, qualifying, grids, laps, pit stops, standings, schedule"
     base_url: "https://api.jolpi.ca/ergast/f1/"
     format: json
     auth: none
-    page_size_max: 100       # verify
+    page_size_max: 100
+    # Published: 4 req/s burst, 500 req/h sustained (docs/rate_limits.md).
     rate_limit:
-      burst_per_second: 4    # verify
-      sustained_per_hour: 500  # verify
+      min_interval_s: 0.3
+      windows:
+        - { calls: 450, period_s: 3600 }
+    # Full history as a CSV zip, free for non-commercial use, published 14 days late.
+    # Use it for bulk history; use the API only for rounds newer than the dump.
+    dumps:
+      index_url: "https://api.jolpi.ca/data/dumps/download/"
+      delayed_csv_url: "https://api.jolpi.ca/data/dumps/download/delayed/?dump_type=csv"
+      delay_days: 14
     coverage:
       results: 1950
-      lap_times: 1996        # verify
-      pit_stops: 2011        # verify
-    project_range: [2001, 2026]
-    docs: "https://github.com/jolpica/jolpica-f1"
-    verify: true
+      qualifying_full: 2003   # 2001-2002 qualifying is mostly missing
+      lap_times: 1996
+      pit_stops: 2011
+    project_range_start: 2001  # no fixed end: always up to the latest completed race
+    docs: "https://github.com/jolpica/jolpica-f1/tree/main/docs"
 
   fastf1:
-    description: "Python library: laps, tyre stints, telemetry, position data, session weather"
+    description: "F1 livetiming archive via FastF1: telemetry, positions, laps, stints, weather"
     kind: python_library
     package: fastf1
+    # Since ~2026-10-15 the archive needs an F1 TV Access (or higher) subscription.
+    # Used only for a one-time backfill of 2018-2022; OpenF1 covers 2023+.
+    auth: f1tv
+    auth_env: [F1_USERNAME, F1_PASSWORD]
     cache_dir_env: FASTF1_CACHE_DIR
-    coverage_from: 2018
-    rate_limit:
-      note: "FastF1 applies its own internal limits; always keep the disk cache enabled"
+    use_for_seasons: [2018, 2022]
+    sessions: all            # FP1-3, sprint qualifying/shootout, sprint, qualifying, race
     docs: "https://docs.fastf1.dev/"
-    verify: true
 
   openf1:
-    description: "Session data, race control messages (historical only in v1)"
+    description: "Telemetry (~3.7 Hz), positions, laps, stints, weather, race control, intervals"
     base_url: "https://api.openf1.org/v1/"
     format: json
     auth: none
-    coverage_from: 2023
-    realtime: false          # real-time access is paid; not used in v1
+    license: "CC BY-NC-SA 4.0, non-commercial"
+    # Published free tier: 3 req/s and 30 req/min.
+    rate_limit:
+      min_interval_s: 0.4
+      windows:
+        - { calls: 28, period_s: 60 }
+    use_from_season: 2023
+    realtime: false          # real-time access is paid; not used
     docs: "https://openf1.org/"
-    verify: true
 
   open_meteo:
     description: "Weather: archive (climate base rates), seasonal outlook, 16-day hourly forecast"
@@ -59,14 +74,16 @@ sources:
     endpoints:
       archive: "https://archive-api.open-meteo.com/v1/archive"
       forecast: "https://api.open-meteo.com/v1/forecast"
-      seasonal: "https://seasonal-api.open-meteo.com/v1/seasonal"  # verify
+      seasonal: "https://seasonal-api.open-meteo.com/v1/seasonal"
     forecast_horizon_days: 16
+    # Headers confirm 600/min. Hourly/daily caps are the published free-tier numbers.
     rate_limit:
-      per_minute: 600        # verify
-      per_hour: 5000         # verify
-      per_day: 10000         # verify
+      min_interval_s: 0.2
+      windows:
+        - { calls: 500, period_s: 60 }
+        - { calls: 4500, period_s: 3600 }
+        - { calls: 9000, period_s: 86400 }
     docs: "https://open-meteo.com/en/docs"
-    verify: true
 
   gdelt:
     description: "News discovery (Phase 6). Store headline/link/source/date/short summary only."
@@ -82,5 +99,5 @@ sources:
     verify: true
 
   manual:
-    description: "Hand-curated circuit metadata (track type, overtaking difficulty, pit-lane loss)"
-    seed_file: "configs/circuits_seed.csv"   # created in Phase 1
+    description: "Hand-curated circuit metadata and the 2027 calendar until APIs publish it"
+    seed_file: "configs/circuits_seed.csv"
