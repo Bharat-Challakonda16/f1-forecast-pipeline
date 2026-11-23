@@ -1,0 +1,62 @@
+name: Ingest FastF1 (2018-2022)
+
+# One-time backfill of 2018-2022 detail through FastF1 (needs an F1 TV login).
+# Each run works for up to 5.5 hours and stops cleanly; the next run continues.
+# Once everything is landed, runs finish in about a minute WITHOUT signing in to F1 TV.
+on:
+  workflow_dispatch:
+    inputs:
+      max_minutes:
+        description: "Stop landing after this many minutes"
+        default: "330"
+      max_sessions:
+        description: "Only this many sessions (leave empty for all)"
+        default: ""
+  schedule:
+    - cron: "45 */6 * * *"
+
+concurrency:
+  group: ingest-fastf1
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      F1_USERNAME: ${{ secrets.F1_USERNAME }}
+      F1_PASSWORD: ${{ secrets.F1_PASSWORD }}
+      FASTF1_AUTH_METHOD: password
+      LANDING: /Volumes/f1_forecast/bronze/landing
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install ".[fastf1]"
+
+      - name: Check secrets
+        run: |
+          for v in DATABRICKS_HOST DATABRICKS_TOKEN F1_USERNAME F1_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v"; exit 1; fi
+          done
+
+      - name: Land sessions
+        id: land
+        run: |
+          args=(--store volume --location "$LANDING" --max-minutes "${{ inputs.max_minutes || '330' }}")
+          if [ -n "${{ inputs.max_sessions }}" ]; then args+=(--max-sessions "${{ inputs.max_sessions }}"); fi
+          python -m f1_forecast.ingest.fastf1_ingest "${args[@]}"
+
+      - name: Load bronze tables
+        if: steps.land.outputs.landed != '0'
+        run: python -m f1_forecast.ops.run_job f1_forecast_fastf1_bronze --timeout-min 120

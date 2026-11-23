@@ -25,7 +25,10 @@ dev = [
     "ruff==0.17.5",
     "black==26.10.1",
     "pre-commit>=3.8",
+    "pandas>=2.2",
 ]
+# FastF1 backfill (2018-2022) only; not needed for the regular pipeline.
+fastf1 = ["fastf1>=3.9.2"]
 # Added in Phase 1+ (kept out until needed so CI stays fast)
 # ingest = ["requests", "tenacity", "fastf1", "polars", "pyarrow"]
 

@@ -16,6 +16,10 @@ resources:
           depends_on:
             - task_key: setup_catalog
           notebook_task:
-            notebook_path: ../notebooks/11_bronze_openf1.py
+            notebook_path: ../notebooks/11_bronze_autoloader.py
             base_parameters:
               catalog: ${var.catalog}
+              source: openf1
+              tables: >-
+                drivers,laps,stints,pit,weather,race_control,intervals,position,
+                session_result,starting_grid,overtakes,car_data,location
