@@ -73,3 +73,46 @@ def test_empty_session_retried_before_accepted(tmp_path):
     assert record_result(store, result) is True
     marker = json.loads(store.read("fastf1/_done/2019_17_FP3.json"))
     assert marker["status"] == "no_timing_data"
+
+
+def test_parse_fill():
+    from f1_forecast.ingest.fastf1_ingest import parse_fill
+
+    assert parse_fill("2018:14:Race") == (2018, 14, "Race", None)
+    assert parse_fill("2021:4:Sprint Qualifying") == (2021, 4, "Sprint Qualifying", None)
+    assert parse_fill("2025:17:Qualifying:laps, results") == (
+        2025,
+        17,
+        "Qualifying",
+        {"laps", "results"},
+    )
+
+
+def test_tolerant_tyre_fix_skips_only_failing_driver():
+    import pandas as pd
+    import pytest
+
+    session_cls = pytest.importorskip("fastf1.core").Session  # optional dependency
+    from f1_forecast.ingest.fastf1_ingest import tolerant_tyre_fix
+
+    attr = "_Session__fix_tyre_info"
+    original = getattr(session_cls, attr)
+
+    def boom(self, df, splits):
+        if df["Driver"].iloc[0] == "7":
+            raise IndexError("list index out of range")
+        return df.assign(fixed=True)
+
+    setattr(session_cls, attr, boom)
+    try:
+        notes: list[str] = []
+        with tolerant_tyre_fix(notes):
+            fix = getattr(session_cls, attr)
+            ok = fix(None, pd.DataFrame({"Driver": ["44"], "Time": [1]}), [])
+            bad = fix(None, pd.DataFrame({"Driver": ["7", "7"], "Time": [2, 1]}), [])
+        assert "fixed" in ok and "fixed" not in bad
+        assert bad["Time"].tolist() == [1, 2]  # fallback keeps messages time-ordered
+        assert notes == ["tyre-info tidy-up skipped for driver 7 (FastF1 IndexError)"]
+        assert getattr(session_cls, attr) is boom  # restored after the block
+    finally:
+        setattr(session_cls, attr, original)

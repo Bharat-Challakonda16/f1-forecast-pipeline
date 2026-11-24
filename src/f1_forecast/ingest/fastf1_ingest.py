@@ -29,7 +29,8 @@ import os
 import shutil
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -135,8 +136,44 @@ def session_tables(session: Any) -> dict[str, Callable[[], Any]]:
     }
 
 
-def ingest_session(store: Store, year: int, rnd: int, name: str, event_name: str) -> dict:
-    """Load one session through FastF1 and land each table. Returns counts and status."""
+@contextmanager
+def tolerant_tyre_fix(notes: list[str]) -> Iterator[None]:
+    """Work around a FastF1 3.9 crash in ``Session.__fix_tyre_info`` (e.g. 2018 Monza race).
+
+    FastF1 tidies each driver's tyre-message timestamps; for a few drivers that step raises
+    ``IndexError`` and FastF1 then discards the *whole* lap table. Here the tidy-up is
+    skipped for just that driver (tyre data kept exactly as F1 recorded it) and noted.
+    """
+    from fastf1.core import Session
+
+    attr = "_Session__fix_tyre_info"
+    original = getattr(Session, attr)
+
+    def patched(self, df, stint_split_times):
+        try:
+            return original(self, df, stint_split_times)
+        except IndexError:
+            driver = df["Driver"].iloc[0] if "Driver" in df and len(df) else "?"
+            notes.append(f"tyre-info tidy-up skipped for driver {driver} (FastF1 IndexError)")
+            # Later steps merge on time, so the raw messages must at least be time-ordered.
+            return df.sort_values("Time", kind="stable").reset_index(drop=True)
+
+    setattr(Session, attr, patched)
+    try:
+        yield
+    finally:
+        setattr(Session, attr, original)
+
+
+def ingest_session(
+    store: Store,
+    year: int,
+    rnd: int,
+    name: str,
+    event_name: str,
+    tables: set[str] | None = None,
+) -> dict:
+    """Load one session through FastF1 and land each table (or only ``tables``)."""
     import fastf1
     from fastf1.exceptions import RateLimitExceededError
 
@@ -156,14 +193,18 @@ def ingest_session(store: Store, year: int, rnd: int, name: str, event_name: str
     counts: dict[str, int] = {}
     errors: dict[str, str] = {}
     for table, get in session_tables(session).items():
+        if tables is not None and table not in tables:
+            continue
         try:
             df = get()
         except Exception as exc:  # data missing for this session/table
             errors[table] = f"{type(exc).__name__}: {exc}"[:200]
             continue
         counts[table] = len(df)
-        if len(df):
-            store.write(f"{SOURCE}/{table}/{year}/{sid}.parquet", frame_to_parquet(df, extra))
+        path = f"{SOURCE}/{table}/{year}/{sid}.parquet"
+        # Landed files are immutable: never rewrite one (bronze has already loaded it).
+        if len(df) and not store.exists(path):
+            store.write(path, frame_to_parquet(df, extra))
     status = "ok" if counts.get("laps") else "no_timing_data"
     return {"session_id": sid, "status": status, "row_counts": counts, "errors": errors}
 
@@ -284,6 +325,51 @@ def run(
     }
 
 
+FillSpec = tuple[int, int, str, set[str] | None]
+
+
+def parse_fill(spec: str) -> FillSpec:
+    """``"2025:17:Qualifying"`` or ``"2025:17:Qualifying:laps,results"`` (only those tables)."""
+    year, rnd, name, *rest = spec.split(":")
+    tables = {t.strip() for t in rest[0].split(",") if t.strip()} if rest else None
+    return int(year), int(rnd), name, tables
+
+
+def fill(store: Store, specs: list[FillSpec]) -> list[dict[str, Any]]:
+    """One-off gap filling for specific sessions, in any year.
+
+    Only tables that are not landed yet are written, so already-loaded data is never
+    duplicated. Results go to ``fastf1/_fills/<session>.json``; ``_done`` is left alone.
+    """
+    import fastf1
+
+    os.environ.setdefault("FASTF1_AUTH_METHOD", "password")
+    log.info("F1 TV sign-in OK (%s)", check_login()["product"])
+    results = []
+    for year, rnd, name, tables in specs:
+        cache_dir = Path(tempfile.mkdtemp(prefix="fastf1_"))
+        fastf1.Cache.enable_cache(str(cache_dir))
+        notes: list[str] = []
+        try:
+            event_name = str(fastf1.get_event(year, rnd)["EventName"])
+            with tolerant_tyre_fix(notes):
+                result = ingest_session(store, year, rnd, name, event_name, tables)
+        finally:
+            shutil.rmtree(cache_dir, ignore_errors=True)
+        result["notes"] = notes
+        result["filled_at"] = datetime.now(UTC).isoformat()
+        store.write(f"{SOURCE}/_fills/{result['session_id']}.json", json.dumps(result).encode())
+        log.info(
+            "fill %s: %s errors=%s notes=%s",
+            result["session_id"],
+            result["row_counts"],
+            result["errors"],
+            notes,
+        )
+        results.append(result)
+    return results
+
+
 def main(argv: list[str] | None = None) -> None:
     cfg = load_sources()[SOURCE]
     first, last = cfg["use_for_seasons"]
@@ -293,8 +379,19 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--years", type=int, nargs="+", default=list(range(first, last + 1)))
     p.add_argument("--max-minutes", type=float, default=330)
     p.add_argument("--max-sessions", type=int, help="Only this many sessions (samples/tests)")
+    p.add_argument(
+        "--fill",
+        nargs="+",
+        metavar="YEAR:ROUND:SESSION",
+        help='Fill gaps, e.g. "2018:14:Race" or "2025:17:Qualifying:laps" (only laps)',
+    )
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    if args.fill:
+        results = fill(make_store(args.store, args.location), [parse_fill(s) for s in args.fill])
+        print(json.dumps(results, indent=2))
+        return
 
     summary = run(
         make_store(args.store, args.location),
