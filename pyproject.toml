@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "f1-forecast"
 version = "0.0.1"
-description = "Unofficial fan project: data-driven predictions for the 2027 F1 season. Not affiliated with Formula 1."
+description = "Unofficial fan project: data-driven predictions for upcoming F1 races. Not affiliated with Formula 1."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Bharat Challakonda" }]

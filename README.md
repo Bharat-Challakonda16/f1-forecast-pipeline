@@ -1,6 +1,6 @@
 # F1 Forecast Pipeline (working name: Grid Oracle)
 
-> Data-driven, race-by-race predictions for the 2027 Formula 1 season, built on a Databricks lakehouse with Monte Carlo race simulation.
+> Data-driven predictions for the **upcoming** Formula 1 races (whatever is next on the calendar, today), updated after every session, built on a Databricks lakehouse with Monte Carlo race simulation. Public launch target: before the 2027 season opener.
 
 **Unofficial fan project. Not affiliated with Formula 1.** Non-commercial. No F1 or team logos, no driver photos.
 
@@ -34,12 +34,14 @@
  Precomputed JSON/Parquet → Streamlit (MVP) → React static site (final)
 ```
 
-Pipelines are incremental and idempotent (Delta `MERGE` on natural keys). Every prediction run is stored with its input versions.
+Pipelines are incremental and idempotent: downloads never repeat (landed files are immutable), bronze loads exactly once (Auto Loader / `MERGE` on file path), and silver is rebuilt deterministically from bronze with 33 data quality checks that fail the build. Every prediction run will be stored with its input versions.
+
+**Current data (Phase 1):** 2001 → latest race results, qualifying and ~880k laps; 2018+ telemetry and car positions (~880M rows, FastF1 + OpenF1); hourly weather per circuit since 2001. See [docs/data_dictionary.md](docs/data_dictionary.md) for every table, key and row count.
 
 ## Phase checklist
 
 - [x] **0. Setup:** repo, tooling, CI, Databricks catalog/schemas, hello Delta job
-- [ ] **1. Data pipeline:** Jolpica, FastF1, Open-Meteo archive, 2027 calendar, circuits seed; bronze → silver; DQ checks
+- [x] **1. Data pipeline:** Jolpica (2001+), OpenF1 (2023+), FastF1 (2018–22), Open-Meteo history, 2027 calendar, circuit facts; bronze → silver; 33 DQ checks; idempotency proven
 - [ ] **2. Features:** driver traits, car profiles, tyre models, incident rates, pace trends
 - [ ] **3. Simulator:** qualifying model, vectorized race sim, season aggregator, 2026 backtest
 - [ ] **4. MVP launch:** Streamlit app
@@ -52,12 +54,15 @@ Pipelines are incremental and idempotent (Delta `MERGE` on natural keys). Every 
 ## Repo layout
 
 ```
-configs/            sources.yaml (API endpoints, rate limits)
-src/f1_forecast/    Python package
-tests/              pytest suite
-databricks/         Asset Bundle (databricks.yml, jobs, notebooks)
-scripts/            helper scripts (dbx.cmd)
-.github/workflows/  CI
+configs/                 sources.yaml (endpoints, limits), calendar_2027.csv, circuits_seed.csv
+src/f1_forecast/ingest/  downloaders: jolpica, openf1, fastf1_ingest, openmeteo (+ shared http client)
+src/f1_forecast/ops/     run_job (trigger Databricks jobs), run_sql (run layered SQL locally)
+databricks/notebooks/    bronze loaders (10-12), silver build + quality (20-21)
+databricks/sql/          silver/*.sql (rebuilt in order), quality/silver_checks.sql
+databricks/resources/    Databricks jobs (Asset Bundle)
+.github/workflows/       ci, ingest_{jolpica,openf1,fastf1,openmeteo}, build_silver
+docs/                    data_dictionary.md
+tests/                   pytest suite
 ```
 
 ## Local setup
@@ -99,7 +104,13 @@ Everything Databricks-related stays inside this repo folder; `~/.databrickscfg` 
 
 ## Data sources and attribution
 
-Jolpica-F1, FastF1, OpenF1 (historical), Open-Meteo (CC BY 4.0, non-commercial), RSS/GDELT (headlines and links only). See [configs/sources.yaml](configs/sources.yaml).
+- [Jolpica-F1](https://github.com/jolpica/jolpica-f1): results, qualifying, laps, pit stops since 2001 (free non-commercial CSV dump + API)
+- [OpenF1](https://openf1.org/): 2023+ telemetry, positions, laps, tyres, weather (CC BY-NC-SA 4.0)
+- [FastF1](https://docs.fastf1.dev/): 2018–2022 detail; since Oct 2026 F1's timing archive needs an F1 TV subscription, used once for the backfill. Raw F1 timing data is never republished; the app shows only derived results.
+- [Open-Meteo](https://open-meteo.com/): weather history and forecasts (CC BY 4.0, non-commercial)
+- RSS/GDELT (Phase 6): headlines and links only
+
+See [configs/sources.yaml](configs/sources.yaml) for endpoints and rate limits.
 
 ## Disclaimer
 

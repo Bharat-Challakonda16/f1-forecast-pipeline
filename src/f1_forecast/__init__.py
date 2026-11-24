@@ -1,4 +1,4 @@
-"""F1 Forecast Pipeline: unofficial fan project predicting the 2027 F1 season.
+"""F1 Forecast Pipeline: unofficial fan project predicting upcoming F1 races.
 
 Not affiliated with Formula 1.
 """
