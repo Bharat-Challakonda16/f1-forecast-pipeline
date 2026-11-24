@@ -1,0 +1,56 @@
+name: Ingest Open-Meteo
+
+# Hourly weather history per circuit. The free tier allows ~10,000 cost units per day, so
+# each daily run spends up to 8,000 and the backfill completes over ~4 days. After that,
+# each run only adds the newly settled month.
+on:
+  workflow_dispatch:
+    inputs:
+      max_cost:
+        description: "Open-Meteo cost units to spend this run"
+        default: "8000"
+  schedule:
+    - cron: "30 3 * * *"
+
+concurrency:
+  group: ingest-openmeteo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      LANDING: /Volumes/f1_forecast/bronze/landing
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install .
+
+      - name: Check secrets
+        run: |
+          if [ -z "$DATABRICKS_HOST" ] || [ -z "$DATABRICKS_TOKEN" ]; then
+            echo "::error::Add DATABRICKS_HOST and DATABRICKS_TOKEN as repository secrets."
+            exit 1
+          fi
+
+      - name: Land weather months
+        id: land
+        run: >
+          python -m f1_forecast.ingest.openmeteo --store volume --location "$LANDING"
+          --max-cost "${{ inputs.max_cost || '8000' }}"
+
+      - name: Load bronze tables
+        if: steps.land.outputs.landed != '0'
+        run: python -m f1_forecast.ops.run_job f1_forecast_openmeteo_bronze --timeout-min 60

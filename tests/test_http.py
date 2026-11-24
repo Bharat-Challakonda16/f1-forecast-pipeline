@@ -176,3 +176,23 @@ def test_client_for_reads_repo_config(tmp_path):
     client = client_for("openf1", LocalStore(tmp_path), load_sources(), load_source_defaults())
     assert client.limiter.windows == [(28, 60.0)]
     assert "non-commercial" in client.user_agent
+
+
+def test_weighted_costs_share_one_budget():
+    clock = FakeClock()
+    lim = RateLimiter(windows=[(10, 60)], clock=clock, sleep=clock.sleep)
+    lim.acquire(cost=4)
+    lim.acquire(cost=4)
+    assert clock.now == 0  # 8 of 10 units used
+    lim.acquire(cost=4)  # would be 12: wait for the first call to roll off
+    assert clock.now == pytest.approx(60)
+    lim.acquire(cost=2)  # 4 + 4 + 2 = 10 within (0, 120]: fits without waiting
+    assert clock.now == pytest.approx(60)
+
+
+def test_cost_larger_than_window_waits_for_empty_window():
+    clock = FakeClock()
+    lim = RateLimiter(windows=[(5, 60)], clock=clock, sleep=clock.sleep)
+    lim.acquire(cost=1)
+    lim.acquire(cost=9)  # capped at the window size: needs the window to be empty
+    assert clock.now == pytest.approx(60)

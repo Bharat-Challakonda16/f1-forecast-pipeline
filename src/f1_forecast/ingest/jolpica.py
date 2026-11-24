@@ -45,6 +45,7 @@ ROUND_ENDPOINTS: dict[str, bool] = {
 }
 # Results usually appear within a few hours of the chequered flag.
 PUBLISH_GRACE = timedelta(hours=3)
+LATEST_DUMP_POINTER = f"{SOURCE}/dump/_LATEST.json"
 
 
 @dataclass(frozen=True, order=True)
@@ -71,6 +72,7 @@ def ingest_dump(client: CachedClient, store: Store, index_url: str) -> str:
     marker = f"{folder}/_SUCCESS"
     if store.exists(marker):
         log.info("dump %s already landed", folder)
+        store.write(LATEST_DUMP_POINTER, json.dumps({"folder": folder}).encode())
         return folder
 
     log.info("downloading dump %s (%.1f MB)", folder, meta["file_size"] / 1e6)
@@ -83,7 +85,19 @@ def ingest_dump(client: CachedClient, store: Store, index_url: str) -> str:
             if name.endswith(".csv") and "/" not in name:
                 store.write(f"{folder}/{name}", zf.read(name))
     store.write(marker, json.dumps({"sha256": digest, **meta}).encode())
+    store.write(LATEST_DUMP_POINTER, json.dumps({"folder": folder}).encode())
     return folder
+
+
+def latest_dump_folder(store: Store) -> str:
+    """Folder of the newest fully landed dump (other ingesters read circuits etc. from it)."""
+    if not store.exists(LATEST_DUMP_POINTER):
+        raise RuntimeError("No Jolpica dump landed yet; run the Jolpica ingest first.")
+    return json.loads(store.read(LATEST_DUMP_POINTER))["folder"]
+
+
+def read_dump_csv(store: Store, folder: str, table: str) -> list[dict[str, str]]:
+    return _read_csv(store, f"{folder}/formula_one_{table}.csv")
 
 
 def _read_csv(store: Store, key: str) -> list[dict[str, str]]:

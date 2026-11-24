@@ -16,6 +16,12 @@ bundle:
 include:
   - resources/*.yml
 
+# Also upload the repo's configs/ (manual seeds such as calendar_2027.csv).
+sync:
+  paths:
+    - .
+    - ../configs
+
 variables:
   catalog:
     description: Unity Catalog catalog holding the bronze/silver/gold schemas

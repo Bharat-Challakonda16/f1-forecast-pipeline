@@ -1,4 +1,5 @@
-# Loads landed Jolpica files into bronze. Triggered by the GitHub ingest workflow after upload.
+# Loads landed Jolpica files and the manual seeds into bronze. Triggered by the GitHub
+# ingest workflow after upload.
 resources:
   jobs:
     jolpica_bronze:
@@ -18,3 +19,12 @@ resources:
             notebook_path: ../notebooks/10_bronze_jolpica.py
             base_parameters:
               catalog: ${var.catalog}
+
+        - task_key: bronze_seeds
+          depends_on:
+            - task_key: setup_catalog
+          notebook_task:
+            notebook_path: ../notebooks/12_bronze_seeds.py
+            base_parameters:
+              catalog: ${var.catalog}
+              configs_dir: ${workspace.file_path}/configs

@@ -39,39 +39,49 @@ Sleep = Callable[[float], None]
 class RateLimiter:
     """Blocks until a call is allowed under every configured limit.
 
-    ``windows`` is a list of ``(max_calls, period_s)`` pairs.
+    ``windows`` is a list of ``(max_units, period_s)`` pairs. A call normally uses one unit;
+    APIs that weight calls (Open-Meteo counts long/large requests as several) pass ``cost``.
     """
 
     min_interval_s: float = 0.0
-    windows: list[tuple[int, float]] = field(default_factory=list)
+    windows: list[tuple[float, float]] = field(default_factory=list)
     clock: Clock = time.monotonic
     sleep: Sleep = time.sleep
 
     def __post_init__(self) -> None:
-        longest = max((calls for calls, _ in self.windows), default=1)
-        self._history: deque[float] = deque(maxlen=longest)
+        self._history: deque[tuple[float, float]] = deque()  # (time, cost)
+        self._horizon = max((period for _, period in self.windows), default=0.0)
 
     @classmethod
     def from_config(cls, cfg: Mapping[str, Any] | None, **kwargs: Any) -> RateLimiter:
         cfg = cfg or {}
-        windows = [(int(w["calls"]), float(w["period_s"])) for w in cfg.get("windows", [])]
+        windows = [(float(w["calls"]), float(w["period_s"])) for w in cfg.get("windows", [])]
         return cls(min_interval_s=float(cfg.get("min_interval_s", 0.0)), windows=windows, **kwargs)
 
-    def _wait_needed(self, now: float) -> float:
+    def _wait_needed(self, now: float, cost: float) -> float:
         wait = 0.0
         if self._history and self.min_interval_s:
-            wait = max(wait, self._history[-1] + self.min_interval_s - now)
-        for calls, period in self.windows:
-            if len(self._history) >= calls:
-                oldest_in_window = self._history[-calls]
-                wait = max(wait, oldest_in_window + period - now)
+            wait = max(wait, self._history[-1][0] + self.min_interval_s - now)
+        for limit, period in self.windows:
+            in_window = [(t, c) for t, c in self._history if t > now - period]
+            excess = sum(c for _, c in in_window) + min(cost, limit) - limit
+            if excess <= 1e-9:
+                continue
+            for t, c in in_window:  # oldest first: wait until enough has rolled off
+                excess -= c
+                if excess <= 1e-9:
+                    wait = max(wait, t + period - now)
+                    break
         return wait
 
-    def acquire(self) -> None:
-        while (wait := self._wait_needed(self.clock())) > 0:
+    def acquire(self, cost: float = 1.0) -> None:
+        while (wait := self._wait_needed(self.clock(), cost)) > 0:
             log.debug("rate limit: sleeping %.2fs", wait)
             self.sleep(wait)
-        self._history.append(self.clock())
+        now = self.clock()
+        while self._history and self._history[0][0] <= now - self._horizon:
+            self._history.popleft()
+        self._history.append((now, cost))
 
 
 # --------------------------------------------------------------------------- response store
@@ -216,11 +226,16 @@ class CachedClient:
         data = self.get_bytes(url, params, key=key, accept=accept_bytes)
         return None if data is None else json.loads(data)
 
-    def fetch(self, url: str, params: Mapping[str, Any] | None = None) -> bytes:
-        """Download without touching the store (rate limits and retries still apply)."""
+    def fetch(
+        self, url: str, params: Mapping[str, Any] | None = None, *, cost: float = 1.0
+    ) -> bytes:
+        """Download without touching the store (rate limits and retries still apply).
+
+        ``cost`` is how many rate-limit units the API charges for this request.
+        """
         last_error = ""
         for attempt in range(1, self.retry.max_attempts + 1):
-            self.limiter.acquire()
+            self.limiter.acquire(cost)
             self.stats["requests"] = self.stats.get("requests", 0) + 1
             try:
                 resp = self.session.get(url, params=params, timeout=self.timeout_s)

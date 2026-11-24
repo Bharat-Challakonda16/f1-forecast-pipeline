@@ -1,0 +1,29 @@
+circuit_ref,circuit_type,speed_profile,length_km,turns,race_laps,overtaking_difficulty,pit_lane_loss_s_est,confidence,notes
+albert_park,temporary,medium,5.278,14,58,3,19,medium,Park roads; layout revised 2022
+americas,permanent,mixed,5.513,20,56,2,20,medium,
+bahrain,permanent,medium,5.412,15,57,1,23,medium,Abrasive surface; night race
+baku,street,high,6.003,20,51,2,20,medium,Very long full-throttle section; castle section very tight
+catalunya,permanent,mixed,4.657,14,66,4,22,medium,Final chicane removed from 2023
+hungaroring,permanent,low,4.381,14,70,4,20,medium,
+imola,permanent,medium,4.909,19,63,4,27,low,
+interlagos,permanent,mixed,4.309,15,71,2,20,medium,Altitude ~785 m; frequent rain
+istanbul,permanent,mixed,5.338,14,58,2,22,low,Last held 2021; returns 2027
+jeddah,street,high,6.174,27,50,3,20,medium,Fastest street circuit; night race
+losail,permanent,high,5.419,16,57,3,25,low,Night race; high tyre loads
+madring,street,mixed,,,,,,low,New in 2026 (Madrid); fill from data
+marina_bay,street,low,4.940,19,62,4,28,medium,Layout shortened 2023; night race; high SC rate
+miami,temporary,mixed,5.412,19,57,3,19,medium,
+monaco,street,low,3.337,19,78,5,19,high,Overtaking nearly impossible
+monza,permanent,high,5.793,11,53,1,24,medium,Lowest downforce of the season
+portimao,permanent,mixed,4.653,15,66,3,20,low,Large elevation changes; last held 2021
+red_bull_ring,permanent,high,4.318,10,71,2,20,medium,Altitude ~678 m
+rodriguez,permanent,high,4.304,17,71,3,22,medium,Altitude ~2230 m: thin air reduces downforce and cooling
+sepang,permanent,mixed,5.543,15,56,2,21,low,Raced 2026 in place of Bahrain
+shanghai,permanent,mixed,5.451,16,56,2,22,medium,
+silverstone,permanent,high,5.891,18,52,2,20,medium,
+spa,permanent,high,7.004,19,44,2,18,medium,Longest lap; local weather often differs across the lap
+suzuka,permanent,high,5.807,18,53,4,22,medium,Figure-of-eight
+vegas,street,high,6.201,17,50,2,20,medium,Cold night race
+villeneuve,temporary,medium,4.361,14,70,2,18,medium,Heavy braking; Wall of Champions
+yas_marina,permanent,medium,5.281,16,58,3,21,medium,Layout revised 2021; twilight race
+zandvoort,permanent,mixed,4.259,14,72,5,18,medium,Banked corners; not on 2027 calendar

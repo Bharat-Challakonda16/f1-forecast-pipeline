@@ -1,0 +1,25 @@
+season,round,grand_prix,circuit_ref,weekend_start,race_date,is_sprint,status
+2027,1,Bahrain Grand Prix,bahrain,2027-03-12,2027-03-14,true,announced
+2027,2,Saudi Arabian Grand Prix,jeddah,2027-03-19,2027-03-21,false,announced
+2027,3,Australian Grand Prix,albert_park,2027-04-02,2027-04-04,true,announced
+2027,4,Japanese Grand Prix,suzuka,2027-04-09,2027-04-11,true,announced
+2027,5,Chinese Grand Prix,shanghai,2027-04-16,2027-04-18,false,announced
+2027,6,Miami Grand Prix,miami,2027-04-30,2027-05-02,false,announced
+2027,7,Canadian Grand Prix,villeneuve,2027-05-21,2027-05-23,true,announced
+2027,8,Monaco Grand Prix,monaco,2027-06-04,2027-06-06,true,announced
+2027,9,Portuguese Grand Prix,portimao,2027-06-18,2027-06-20,false,announced
+2027,10,British Grand Prix,silverstone,2027-07-02,2027-07-04,true,announced
+2027,11,Austrian Grand Prix,red_bull_ring,2027-07-09,2027-07-11,false,announced
+2027,12,Belgian Grand Prix,spa,2027-07-23,2027-07-25,false,announced
+2027,13,Hungarian Grand Prix,hungaroring,2027-07-30,2027-08-01,false,announced
+2027,14,Italian Grand Prix,monza,2027-09-03,2027-09-05,true,announced
+2027,15,Spanish Grand Prix,madring,2027-09-10,2027-09-12,false,announced
+2027,16,Azerbaijan Grand Prix,baku,2027-09-24,2027-09-26,false,announced
+2027,17,Turkish Grand Prix,istanbul,2027-10-01,2027-10-03,false,announced
+2027,18,Singapore Grand Prix,marina_bay,2027-10-08,2027-10-10,false,announced
+2027,19,United States Grand Prix,americas,2027-10-22,2027-10-24,false,announced
+2027,20,Mexico City Grand Prix,rodriguez,2027-10-29,2027-10-31,false,announced
+2027,21,São Paulo Grand Prix,interlagos,2027-11-05,2027-11-07,true,announced
+2027,22,Las Vegas Grand Prix,vegas,2027-11-18,2027-11-20,false,announced
+2027,23,Qatar Grand Prix,losail,2027-12-03,2027-12-05,true,announced
+2027,24,Abu Dhabi Grand Prix,yas_marina,2027-12-10,2027-12-12,true,announced

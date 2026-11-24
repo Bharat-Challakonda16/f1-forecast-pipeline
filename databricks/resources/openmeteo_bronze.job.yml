@@ -1,0 +1,22 @@
+# Loads newly landed Open-Meteo weather files into bronze (Auto Loader).
+resources:
+  jobs:
+    openmeteo_bronze:
+      name: f1_forecast_openmeteo_bronze
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: setup_catalog
+          notebook_task:
+            notebook_path: ../notebooks/00_setup_catalog.py
+            base_parameters:
+              catalog: ${var.catalog}
+
+        - task_key: bronze_openmeteo
+          depends_on:
+            - task_key: setup_catalog
+          notebook_task:
+            notebook_path: ../notebooks/11_bronze_autoloader.py
+            base_parameters:
+              catalog: ${var.catalog}
+              source: openmeteo
+              tables: archive
