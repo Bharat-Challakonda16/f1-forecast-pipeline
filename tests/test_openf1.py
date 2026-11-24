@@ -102,6 +102,13 @@ def test_unpublished_session_returns_none(tmp_path):
     assert FakeOpenF1(LocalStore(tmp_path), data).ingest_session(SESSION) is None
 
 
+def test_old_session_missing_laps_is_landed_as_partial(tmp_path):
+    data = full_data() | {"laps": []}
+    counts = FakeOpenF1(LocalStore(tmp_path), data).ingest_session(SESSION, require_complete=False)
+    assert counts["laps"] == 0
+    assert counts["car_data"] == 6  # everything else that exists is still landed
+
+
 def test_interrupted_session_resumes_without_refetching_landed_files(tmp_path):
     store = LocalStore(tmp_path)
     FakeOpenF1(store, full_data()).ingest_session(SESSION)

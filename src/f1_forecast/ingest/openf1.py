@@ -59,6 +59,9 @@ DRIVER_ENDPOINTS = ["car_data", "location"]  # high-frequency: one request per d
 REQUIRED = ("drivers", "laps")
 # OpenF1 processes sessions shortly after they end; give it time before trusting them.
 PUBLISH_GRACE = timedelta(hours=3)
+# If a required endpoint is still empty this long after the session, OpenF1 simply doesn't
+# have it (e.g. 2025 Baku qualifying laps). Land what exists instead of retrying forever.
+GIVE_UP_AFTER = timedelta(days=7)
 
 
 # --------------------------------------------------------------------------- conversion
@@ -138,14 +141,20 @@ class OpenF1:
             self.store.write(path, records_to_parquet(records))
         return records
 
-    def ingest_session(self, session: dict[str, Any]) -> dict[str, int] | None:
-        """Land every endpoint for one session. Row counts, or None if not published yet."""
+    def ingest_session(
+        self, session: dict[str, Any], require_complete: bool = True
+    ) -> dict[str, int] | None:
+        """Land every endpoint for one session. Row counts, or None if not published yet.
+
+        With ``require_complete=False`` (old sessions), a missing required endpoint no longer
+        blocks the session: whatever OpenF1 has is landed and the gap shows as a 0 count.
+        """
         counts: dict[str, int] = {}
         drivers: list[dict[str, Any]] = []
         for endpoint in SESSION_ENDPOINTS:
             records = self.land(endpoint, session)
             counts[endpoint] = len(records)
-            if endpoint in REQUIRED and not records:
+            if endpoint in REQUIRED and not records and require_complete:
                 log.info("%s: %s empty, not published yet", session["session_key"], endpoint)
                 return None
             if endpoint == "drivers":
@@ -204,11 +213,20 @@ def run(
             break
         label = f"{session['year']} {session['location']} {session['session_name']}"
         t0 = time.monotonic()
-        counts = api.ingest_session(session)
+        ended = datetime.fromisoformat(session["date_end"])
+        counts = api.ingest_session(session, require_complete=now - ended < GIVE_UP_AFTER)
         if counts is None:
             pending.append(label)
             continue
-        marker = {"session": session, "row_counts": counts, "landed_at": now.isoformat()}
+        missing = [e for e in REQUIRED if counts.get(e) == 0]
+        if missing:
+            log.warning("%s: accepted without %s (source has no data)", label, missing)
+        marker = {
+            "session": session,
+            "row_counts": counts,
+            "status": f"partial: no {', '.join(missing)}" if missing else "ok",
+            "landed_at": now.isoformat(),
+        }
         store.write(f"{SOURCE}/_done/{session['session_key']}.json", json.dumps(marker).encode())
         landed.append(label)
         log.info("[%d/%d] %s %s (%.0fs)", i, len(todo), label, counts, time.monotonic() - t0)
