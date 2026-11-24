@@ -36,3 +36,8 @@ Thumbs.db
 # Front end (later phases)
 node_modules/
 web/dist/
+
+# Landing folders created by local ingest runs (real landing is the Databricks Volume)
+/jolpica/
+/openf1/
+/fastf1/
