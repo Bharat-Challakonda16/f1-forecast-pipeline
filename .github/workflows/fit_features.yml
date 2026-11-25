@@ -1,0 +1,55 @@
+name: Fit features
+
+# Fits the Bayesian driver-trait models on fresh data and stores a new version in
+# gold.driver_traits. Weekly after race weekends (after Jolpica + silver), or on demand,
+# optionally with an earlier data cutoff for backtests.
+on:
+  workflow_dispatch:
+    inputs:
+      trait:
+        description: "Trait to fit (or 'all')"
+        default: "all"
+      as_of:
+        description: "Data cutoff date YYYY-MM-DD (empty = today)"
+        default: ""
+  schedule:
+    - cron: "0 11 * * 2"
+
+concurrency:
+  group: fit-features
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install ".[models]"
+
+      - name: Fit
+        run: |
+          traits="${{ inputs.trait || 'all' }}"
+          if [ "$traits" = "all" ]; then
+            traits=$(python -c "from f1_forecast.features.run_traits import TRAITS; print(' '.join(TRAITS))")
+          fi
+          as_of_arg=""
+          if [ -n "${{ inputs.as_of }}" ]; then as_of_arg="--as-of ${{ inputs.as_of }}"; fi
+          for t in $traits; do
+            echo "::group::$t"
+            python -m f1_forecast.features.run_traits --trait "$t" $as_of_arg
+            echo "::endgroup::"
+          done

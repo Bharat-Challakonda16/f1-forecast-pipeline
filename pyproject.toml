@@ -29,6 +29,8 @@ dev = [
 ]
 # FastF1 backfill (2018-2022) only; not needed for the regular pipeline.
 fastf1 = ["fastf1>=3.9.2"]
+# Bayesian feature models (Phase 2): run on CI / locally for samples.
+models = ["pymc>=5.20", "nutpie>=0.16", "arviz>=0.20"]
 # Added in Phase 1+ (kept out until needed so CI stays fast)
 # ingest = ["requests", "tenacity", "fastf1", "polars", "pyarrow"]
 
@@ -38,6 +40,7 @@ packages = ["src/f1_forecast"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = ["slow: fits a Bayesian model (seconds to minutes)"]
 
 [tool.black]
 line-length = 100

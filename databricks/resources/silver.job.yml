@@ -1,4 +1,5 @@
-# Rebuilds the silver layer from bronze, then runs the data quality checks (fails loudly).
+# Rebuilds silver from bronze, runs the data quality checks (fails loudly), then rebuilds
+# the gold model inputs (teammate gaps etc.) that the feature models read.
 resources:
   jobs:
     silver_build:
@@ -20,3 +21,12 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               checks_file: ${workspace.file_path}/databricks/sql/quality/silver_checks.sql
+
+        - task_key: build_gold_inputs
+          depends_on:
+            - task_key: quality_checks
+          notebook_task:
+            notebook_path: ../notebooks/20_silver_build.py
+            base_parameters:
+              catalog: ${var.catalog}
+              sql_dir: ${workspace.file_path}/databricks/sql/gold
