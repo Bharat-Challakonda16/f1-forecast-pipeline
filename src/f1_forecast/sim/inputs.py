@@ -6,12 +6,15 @@ traits come from the latest fit with ``data_cutoff <= as_of``.
 
 Pace convention everywhere: **% of lap time, lower = faster**.
 
-Car vs driver: a team's measured gap includes its drivers, so
+Car vs driver: when a joint field-model fit exists (``gold.field_effects``, see
+``features.field_model``) the car's pace at its latest round, its strength on this track type
+and each driver's skill + track-type + this-circuit bonus come from it. Otherwise a team's
+measured gap includes its drivers, so
 
     car_gap      = team gap - mean skill of the drivers who produced it
     driver pace  = car_gap + driver skill
 
-which lets the simulator handle line-up changes and teammates of different strength.
+Either way the simulator can handle line-up changes and teammates of different strength.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from f1_forecast.sim.circuit_params import event_rates, overtaking, pit_loss, tyre_params
+from f1_forecast.sim.field_inputs import apply_field_effects
 
 CATALOG = "f1_forecast"
 TRAITS = [
@@ -50,6 +54,7 @@ TRAIT_PRIORS = {
 TRAIT_DRIFT = {"quali_pace": 0.13, "race_pace": 0.13, "wet_skill": 0.1, "starts": 0.2}
 TEAM_FORM_SD = 0.45  # % lap time: event-to-event team pace variation (measured 0.3-0.6)
 EWMA_HALF_LIFE = 5.0  # races
+FIELD_MODEL_VERSION = "field_rw_v1"
 
 
 @dataclass
@@ -130,6 +135,27 @@ def car_gaps(team_events: pd.DataFrame, lineup_skill: pd.DataFrame) -> pd.DataFr
     return cars
 
 
+LAP1_RETIRE_SHARE = 0.4 * 1.5  # cars retiring per lap-1 incident (see race.py)
+
+
+def scale_retirements(
+    drivers: pd.DataFrame, teams: pd.DataFrame, field_rate: float, lap1_prob: float
+) -> tuple[pd.DataFrame, pd.DataFrame, float]:
+    """Scale team mechanical-failure and driver-error rates by one common factor so that the
+    field's average retirement rate matches ``field_rate`` (measured in recent seasons),
+    keeping who is more or less reliable. Lap-1 incident retirements count towards it."""
+    t = teams.set_index("constructor_id")["reliability_dnf_rate"]
+    rel = drivers["constructor_id"].map(t).fillna(t.mean())
+    err = drivers["error_rate"].fillna(TRAIT_PRIORS["error_rate"][0])
+    lap1 = lap1_prob * LAP1_RETIRE_SHARE / max(len(drivers), 1)
+    modelled = float((rel + err).mean())
+    factor = float(np.clip((field_rate - lap1) / modelled, 0.2, 2.0)) if modelled > 0 else 1.0
+    d, tm = drivers.copy(), teams.copy()
+    d["error_rate"] = err * factor
+    tm["reliability_dnf_rate"] = tm["reliability_dnf_rate"] * factor
+    return d, tm, factor
+
+
 def sane_compound_pace(tyres: pd.DataFrame, global_offsets: pd.DataFrame) -> pd.DataFrame:
     """Fresh-tyre pace must order Soft < Medium < Hard (faster = lower). Circuits with too
     little data can violate that (e.g. Lusail); then the global medians are used instead."""
@@ -146,7 +172,9 @@ def sane_compound_pace(tyres: pd.DataFrame, global_offsets: pd.DataFrame) -> pd.
     return t.reset_index()
 
 
-def load_event_inputs(season: int, rnd: int, as_of: date | None = None) -> EventInputs:
+def load_event_inputs(
+    season: int, rnd: int, as_of: date | None = None, *, use_field: bool = True
+) -> EventInputs:
     from databricks.sdk import WorkspaceClient
 
     w = WorkspaceClient()
@@ -256,6 +284,48 @@ def load_event_inputs(season: int, rnd: int, as_of: date | None = None) -> Event
     teams["reliability_dnf_rate"] = teams["reliability_dnf_rate"].fillna(0.08)
     teams["form_sd"] = TEAM_FORM_SD
 
+    # Joint field model (car per round incl. upgrades, driver x track bonuses), if fitted
+    # at or before the cutoff: replaces the car gaps and the pace traits above.
+    field_cutoff = None
+    if use_field:
+        fe = _q(
+            w,
+            wh,
+            f"""
+            SELECT kind, effect, constructor_id, driver_id, circuit_id, speed_profile, season,
+                   round, value, std_err, n_samples, data_cutoff
+            FROM {cat}.gold.field_effects f
+            WHERE model_version = '{FIELD_MODEL_VERSION}' AND data_cutoff = (
+              SELECT max(data_cutoff) FROM {cat}.gold.field_effects x
+              WHERE x.model_version = f.model_version AND x.kind = f.kind
+                AND x.data_cutoff <= DATE'{as_of}')""",
+        )
+        if not fe.empty:
+            for col in ("season", "round", "value", "std_err", "n_samples"):
+                fe[col] = pd.to_numeric(fe[col])
+            field_cutoff = str(fe["data_cutoff"].max())[:10]
+            drivers, teams = apply_field_effects(
+                fe,
+                drivers,
+                teams,
+                season=season,
+                circuit_id=cid,
+                speed_profile=ev["speed_profile"],
+            )
+
+    # Retirements: scale the per-team / per-driver rates to the field's recent level.
+    recent = _q(
+        w,
+        wh,
+        f"""
+        SELECT avg(CAST(r.status_class NOT IN ('finished') AS INT)) AS rate
+        FROM {cat}.silver.results r JOIN {cat}.silver.events e USING (season, round)
+        WHERE r.session_code = 'R' AND e.race_date < DATE'{as_of}'
+          AND r.season >= year(DATE'{as_of}') - 2
+          AND r.status_class NOT IN ('did_not_start', 'did_not_qualify', 'disqualified')""",
+    )
+    field_dnf_rate = float(recent.iloc[0, 0]) if len(recent) and recent.iloc[0, 0] else 0.14
+
     # Circuit parameters from per-race tables, only races before the cutoff (no leakage).
     before = f"e.race_date < DATE'{as_of}'"
     ref_season = int(season)
@@ -339,6 +409,9 @@ def load_event_inputs(season: int, rnd: int, as_of: date | None = None) -> Event
         **{k: float(v) if v is not None and pd.notna(v) else None for k, v in c.items()},
     }
     circuit["pit_loss_s"] = circuit.get("pit_loss_s") or 22.0
+    drivers, teams, dnf_factor = scale_retirements(
+        drivers, teams, field_dnf_rate, circuit.get("lap1_incident_prob") or 0.0
+    )
     return EventInputs(
         season=season,
         round=rnd,
@@ -347,5 +420,11 @@ def load_event_inputs(season: int, rnd: int, as_of: date | None = None) -> Event
         drivers=drivers,
         teams=teams,
         tyres=tyres,
-        meta={"pace_season": pace_season, "race_date": str(race_date)},
+        meta={
+            "pace_season": pace_season,
+            "race_date": str(race_date),
+            "field_cutoff": field_cutoff,
+            "field_dnf_rate": field_dnf_rate,
+            "dnf_scale": dnf_factor,
+        },
     )

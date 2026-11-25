@@ -139,3 +139,17 @@ def test_unreachable_rate_switches_on_the_slipstream():
     g = np.tile(np.arange(1, 9), (400, 1))
     c = calibrate_pass_k(d, t, TYRES, circuit(), g, target=3.0, sims=400, iterations=6)
     assert c.slipstream > 0 and c.threshold_s < 0.2 and c.dirty_air_pct < 0.25
+
+
+def test_strategy_consensus_shares_stop_count():
+    from f1_forecast.sim.race import strategy_choices
+    from f1_forecast.sim.strategy import Plan
+
+    plans = [Plan((0, 1), (20,), 0.0), Plan((1, 2), (25,), 1.0), Plan((0, 1, 1), (15, 35), 0.5)]
+    probs = np.array([0.4, 0.2, 0.4])
+    rng = np.random.default_rng(0)
+    c = strategy_choices(plans, probs, 500, 10, rng, follow=1.0)
+    stops = np.array([p.stops for p in plans])[c]
+    assert (stops == stops[:, :1]).all()  # everyone follows the race's stop count
+    free = strategy_choices(plans, probs, 500, 10, rng, follow=0.0)
+    assert not (np.array([p.stops for p in plans])[free] == 1).all(axis=1).all()

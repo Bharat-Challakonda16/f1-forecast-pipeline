@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       trait:
-        description: "Trait to fit (or 'all')"
+        description: "Trait to fit ('all', a trait name, or 'field' for the joint field model)"
         default: "all"
       as_of:
         description: "Data cutoff date YYYY-MM-DD (empty = today)"
@@ -42,6 +42,7 @@ jobs:
         run: pip install ".[models]"
 
       - name: Fit
+        if: ${{ inputs.trait != 'field' }}
         run: |
           traits="${{ inputs.trait || 'all' }}"
           if [ "$traits" = "all" ]; then
@@ -55,6 +56,13 @@ jobs:
             python -m f1_forecast.features.run_traits --trait "$t" $as_of_arg
             echo "::endgroup::"
           done
+
+      - name: Joint field model (car per round, driver x track bonuses)
+        if: ${{ (inputs.trait || 'all') == 'all' || inputs.trait == 'field' }}
+        run: |
+          as_of_arg=""
+          if [ -n "${{ inputs.as_of }}" ]; then as_of_arg="--as-of ${{ inputs.as_of }}"; fi
+          python -m f1_forecast.features.run_field $as_of_arg
 
       - name: Corner speeds (new qualifying sessions) + season profiles
         run: |

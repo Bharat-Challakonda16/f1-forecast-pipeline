@@ -33,14 +33,20 @@ import numpy as np
 import pandas as pd
 
 from f1_forecast.backtest.metrics import calibration_table, event_scores, rank_baseline_probs
+from f1_forecast.features.run_field import MODEL_VERSION as FIELD_VERSION
+from f1_forecast.features.run_field import run as fit_field
 from f1_forecast.features.run_traits import CATALOG, OUTPUT_VOLUME, TRAITS, execute, query_df
 from f1_forecast.features.run_traits import run as fit_trait
 from f1_forecast.sim.inputs import load_event_inputs
-from f1_forecast.sim.quali import simulate_qualifying
+from f1_forecast.sim.quali import observed_team_surprise, simulate_qualifying
 from f1_forecast.sim.race import calibrate_pass_k, simulate_race
 
 log = logging.getLogger(__name__)
-MODEL_VERSION = "sim_v1"
+# sim_v2: shared estimate draws for qualifying and race, qualifying surprise carried into
+# race pace, race-wide strategy consensus and undercut cover.
+# sim_v3: + joint field model (car per round incl. upgrades, driver x track bonuses).
+# sim_v4: + lap-1 spread growing down the grid, retirement rates scaled to the field level.
+MODEL_VERSION = "sim_v4"
 
 
 @dataclass
@@ -70,17 +76,33 @@ def ensure_traits(ctx: Ctx, as_of: date, draws: int) -> list[str]:
     return fitted
 
 
+def ensure_field(ctx: Ctx, as_of: date) -> list[str]:
+    """Fit the joint field model at exactly this cutoff if it isn't stored yet."""
+    exists = ctx.q(f"SHOW TABLES IN {CATALOG}.gold LIKE 'field_effects'")
+    have = []
+    if not exists.empty:
+        have = ctx.q(f"""
+            SELECT DISTINCT kind FROM {CATALOG}.gold.field_effects
+            WHERE model_version = '{FIELD_VERSION}' AND data_cutoff = DATE'{as_of}'""")[
+            "kind"
+        ].tolist()
+    missing = [k for k in ("quali", "race") if k not in have]
+    if missing:
+        fit_field(as_of, missing)
+    return [f"field_{k}" for k in missing]
+
+
 def history(ctx: Ctx, season: int) -> pd.DataFrame:
     """Race and sprint results for the season and the four before (for baselines)."""
     df = ctx.q(f"""
         SELECT r.season, r.round, r.session_code, r.driver_id, r.grid, r.position, r.points,
-               q.position AS quali_position
+               q.position AS quali_position, least(q.q1_ms, q.q2_ms, q.q3_ms) AS quali_best_ms
         FROM {CATALOG}.silver.results r
         LEFT JOIN {CATALOG}.silver.qualifying q
           ON q.season = r.season AND q.round = r.round AND q.session_code = 'Q'
          AND q.driver_id = r.driver_id AND r.session_code = 'R'
         WHERE r.season BETWEEN {season - 4} AND {season}""")
-    for c in ("season", "round", "grid", "position", "points", "quali_position"):
+    for c in ("season", "round", "grid", "position", "points", "quali_position", "quali_best_ms"):
         df[c] = pd.to_numeric(df[c])
     return df
 
@@ -162,8 +184,16 @@ def frequency_tables(hist: pd.DataFrame, season: int) -> dict[str, pd.DataFrame]
 # --------------------------------------------------------------------------- predict
 
 
-def predict_round(ctx: Ctx, season: int, rnd: int, as_of: date, sims: int, actual: pd.DataFrame):
-    ev = load_event_inputs(season, rnd, as_of)
+def predict_round(
+    ctx: Ctx,
+    season: int,
+    rnd: int,
+    as_of: date,
+    sims: int,
+    actual: pd.DataFrame,
+    use_field: bool = True,
+):
+    ev = load_event_inputs(season, rnd, as_of, use_field=use_field)
     # Score only drivers who actually raced (the entry list is known before a weekend).
     ev.drivers = ev.drivers[ev.drivers["driver_id"].isin(actual["driver_id"])].reset_index(
         drop=True
@@ -171,13 +201,35 @@ def predict_round(ctx: Ctx, season: int, rnd: int, as_of: date, sims: int, actua
     ev.teams = ev.teams[ev.teams["constructor_id"].isin(ev.drivers["constructor_id"])].reset_index(
         drop=True
     )
+    # One draw of "how wrong are our estimates" per simulation, shared by qualifying and the
+    # race (same car, same drivers).
+    rng = np.random.default_rng(2027)
+    car_z = rng.standard_normal((sims, len(ev.teams)))
+    skill_z = rng.standard_normal((sims, len(ev.drivers)))
     q = simulate_qualifying(
-        ev.drivers, ev.teams, speed_profile=ev.circuit["speed_profile"], sims=sims
+        ev.drivers,
+        ev.teams,
+        speed_profile=ev.circuit["speed_profile"],
+        sims=sims,
+        car_z=car_z,
+        skill_z=skill_z,
     )
     calib = calibrate_pass_k(ev.drivers, ev.teams, ev.tyres, ev.circuit, q.grid)
     pre = simulate_race(
-        ev.drivers, ev.teams, ev.tyres, ev.circuit, q.grid, n_replays=0, **calib.race_kwargs()
+        ev.drivers,
+        ev.teams,
+        ev.tyres,
+        ev.circuit,
+        q.grid,
+        n_replays=0,
+        car_z=car_z,
+        skill_z=skill_z,
+        quali_surprise=q.team_surprise,
+        **calib.race_kwargs(),
     )
+    best = actual.set_index("driver_id")["quali_best_ms"].astype(float)
+    quali_pct = 100 * np.log(best / best.median())
+    surprise = observed_team_surprise(ev.drivers, ev.teams, quali_pct, ev.circuit["speed_profile"])
     grid_actual = (
         actual.set_index("driver_id")["grid"]
         .reindex(ev.drivers["driver_id"])
@@ -195,6 +247,9 @@ def predict_round(ctx: Ctx, season: int, rnd: int, as_of: date, sims: int, actua
         np.tile(grid_actual, (sims, 1)),
         seed=7,
         n_replays=0,
+        car_z=car_z,
+        skill_z=skill_z,
+        quali_surprise=surprise,
         **calib.race_kwargs(),
     )
     qs = q.summary().drop(columns="grid_distribution").rename(columns={"p_top3": "p_top3_grid"})
@@ -233,7 +288,15 @@ def store(ctx: Ctx, df: pd.DataFrame, table: str, keys: list[str], name: str) ->
 # --------------------------------------------------------------------------- run
 
 
-def run(season: int, rounds: list[int] | None, sims: int, fit_draws: int) -> dict:
+def run(
+    season: int,
+    rounds: list[int] | None,
+    sims: int,
+    fit_draws: int,
+    *,
+    use_field: bool = True,
+    model_version: str = MODEL_VERSION,
+) -> dict:
     from databricks.sdk import WorkspaceClient
 
     w = WorkspaceClient()
@@ -254,13 +317,15 @@ def run(season: int, rounds: list[int] | None, sims: int, fit_draws: int) -> dic
         rnd = int(row.round)
         as_of = date.fromisoformat(str(row.race_date)[:10]) - timedelta(days=3)
         fitted = ensure_traits(ctx, as_of, fit_draws)
+        if use_field:
+            fitted += ensure_field(ctx, as_of)
         races = hist[
             (hist["season"] == season) & (hist["round"] == rnd) & (hist["session_code"] == "R")
         ]
-        actual = races[["driver_id", "grid", "position", "quali_position"]].copy()
-        pred, ev = predict_round(ctx, season, rnd, as_of, sims, actual)
-        pred["snapshot_id"] = pred["stage"] + f":{season}_{rnd:02d}:{as_of}:{MODEL_VERSION}"
-        pred["model_version"], pred["created_at"] = MODEL_VERSION, created
+        actual = races[["driver_id", "grid", "position", "quali_position", "quali_best_ms"]].copy()
+        pred, ev = predict_round(ctx, season, rnd, as_of, sims, actual, use_field)
+        pred["snapshot_id"] = pred["stage"] + f":{season}_{rnd:02d}:{as_of}:{model_version}"
+        pred["model_version"], pred["created_at"] = model_version, created
         all_preds.append(pred)
 
         a = actual.set_index("driver_id")
@@ -361,7 +426,7 @@ def run(season: int, rounds: list[int] | None, sims: int, fit_draws: int) -> dic
     long = scores.melt(
         id_vars=["round", "stage", "method", "kind"], var_name="metric", value_name="value"
     ).dropna()
-    long["season"], long["model_version"], long["created_at"] = season, MODEL_VERSION, created
+    long["season"], long["model_version"], long["created_at"] = season, model_version, created
     store(
         ctx,
         long,
@@ -375,7 +440,7 @@ def run(season: int, rounds: list[int] | None, sims: int, fit_draws: int) -> dic
     summary = summary.rename(columns={"mean": "value", "count": "n_events"})
     summary["season"], summary["model_version"], summary["created_at"] = (
         season,
-        MODEL_VERSION,
+        model_version,
         created,
     )
     store(
@@ -402,7 +467,7 @@ def run(season: int, rounds: list[int] | None, sims: int, fit_draws: int) -> dic
         t["stage"], t["prediction"] = stage, col
         cal.append(t)
     calib = pd.concat(cal, ignore_index=True)
-    calib["season"], calib["model_version"], calib["created_at"] = season, MODEL_VERSION, created
+    calib["season"], calib["model_version"], calib["created_at"] = season, model_version, created
     store(
         ctx,
         calib,
@@ -419,9 +484,17 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--rounds", type=int, nargs="+")
     p.add_argument("--sims", type=int, default=10_000)
     p.add_argument("--fit-draws", type=int, default=500)
+    p.add_argument("--no-field", action="store_true", help="old car/driver inputs (sim_v2)")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    out = run(args.season, args.rounds, args.sims, args.fit_draws)
+    out = run(
+        args.season,
+        args.rounds,
+        args.sims,
+        args.fit_draws,
+        use_field=not args.no_field,
+        model_version="sim_v2" if args.no_field else MODEL_VERSION,
+    )
     print(json.dumps({k: v for k, v in out.items() if k != "summary"}, indent=1))
     s = pd.DataFrame(out["summary"]).pivot_table(
         index=["stage", "metric"], columns="method", values="value"

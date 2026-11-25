@@ -28,6 +28,9 @@ class QualiResult:
     driver_ids: list[str]
     grid: np.ndarray  # (sims, drivers): grid position (1 = pole) of each driver per sim
     pace: np.ndarray  # (sims, drivers): simulated lap deficit, %
+    # (sims, teams): how much faster/slower than expected each team qualified (weekend form +
+    # lap execution, not the estimate error), which carries into the race (QUALI_TO_RACE)
+    team_surprise: np.ndarray | None = None
 
     def summary(self) -> pd.DataFrame:
         g = self.grid
@@ -47,7 +50,13 @@ class QualiResult:
         return out.sort_values("expected_grid").reset_index(drop=True)
 
 
-def track_type_adjustment(teams: pd.DataFrame, speed_profile: str | None) -> pd.Series:
+def track_type_adjustment(
+    teams: pd.DataFrame, speed_profile: str | None, kind: str = "quali"
+) -> pd.Series:
+    """Car strength at this kind of track (% lap, lower = faster). Prefers the field model's
+    car x track-type effect (``track_adj_<kind>``); else half the season-to-date index."""
+    if f"track_adj_{kind}" in teams:
+        return pd.to_numeric(teams[f"track_adj_{kind}"]).fillna(0.0)
     col = {
         "high": "high_speed_track_idx",
         "low": "low_speed_track_idx",
@@ -97,4 +106,35 @@ def simulate_qualifying(
     execution = rng.normal(0.0, execution_sd, (sims, len(drivers)))
     pace = (car + form + adj)[:, k] + skill + execution
     grid = pace.argsort(axis=1).argsort(axis=1) + 1
-    return QualiResult(drivers["driver_id"].tolist(), grid, pace)
+    counts = np.bincount(k, minlength=len(t)).clip(min=1)
+    team_exec = (
+        np.stack([np.bincount(k, weights=row, minlength=len(t)) for row in execution]) / counts
+    )
+    surprise = form + team_exec
+    surprise -= surprise.mean(axis=1, keepdims=True)  # only relative pace matters
+    return QualiResult(drivers["driver_id"].tolist(), grid, pace, surprise)
+
+
+def observed_team_surprise(
+    drivers: pd.DataFrame,
+    teams: pd.DataFrame,
+    quali_pace_pct: pd.Series,
+    speed_profile: str | None = None,
+) -> np.ndarray:
+    """(teams,) actual qualifying surprise per team: its drivers' measured pace this weekend
+    (``quali_pace_pct`` by driver_id, % vs session median) minus what the estimates expected,
+    both centred on the field. Teams without a time get 0."""
+    t = teams.reset_index(drop=True)
+    d = drivers.assign(obs=drivers["driver_id"].map(quali_pace_pct))
+    adj = track_type_adjustment(t, speed_profile)
+    d["exp"] = (
+        d["constructor_id"].map(pd.Series((t["car_quali"] + adj).to_numpy(), t["constructor_id"]))
+        + d["quali_pace"]
+    )
+    d = d.dropna(subset=["obs"])
+    d = d[(d["obs"] - d["obs"].median()).abs() <= 5]  # crashes / no lap: no information
+    if d.empty:
+        return np.zeros(len(t))
+    per = d.groupby("constructor_id")[["obs", "exp"]].mean()
+    s = (per["obs"] - per["obs"].mean()) - (per["exp"] - per["exp"].mean())
+    return s.reindex(t["constructor_id"]).fillna(0.0).to_numpy()

@@ -111,6 +111,53 @@ is small.
   medium (<210) or high by the field's median apex speed; each team's best apex speed is
   compared with the field.
 
+## Joint field model: car form vs driver, and driver ability at each track
+
+A result at a track only tells you about the driver once you know how good the car was **at
+that point of the season**. Cars change through a year: in 2026 the Red Bull started slow
+and was upgraded, so early-season results say more about the car than about Verstappen. The
+teammate models above cancel the car out but use only two drivers per comparison and ignore
+how fast the car itself was. The joint field model (`features/field_model.py`, 2010+, fitted
+separately for qualifying and for race pace) uses the whole field every weekend.
+
+One observation is one driver's pace in one dry session, relative to the session median
+(qualifying: best lap; race: median clean lap, ≥10 laps), table `gold.driver_session_pace`.
+It is split into:
+
+| Part | Meaning | Prior / structure |
+|---|---|---|
+| session | how the field ran that day | Normal(0, 0.5) |
+| **car[team, round]** | the car's pace *at that round* | random walk through each season, so upgrades show up as steps; the spread per round is learned (qualifying ≈0.17%, race ≈0.10%) |
+| car × track type | this car on high/medium/low/mixed-speed tracks, per season | Normal(0, learned σ) |
+| skill[driver, season] | the driver | career random walk |
+| driver × track type | e.g. a driver who is strong on street-like slow tracks | Student-t(3), learned σ |
+| **driver × circuit** | e.g. Pérez in Baku, Alonso in Singapore | Student-t(3), learned σ |
+
+Teammates share the car terms in every session, so a driver's numbers are always net of the
+car he had that weekend. Drivers who change teams tie the car scales together.
+
+**Shrinkage.** Every bonus starts at zero and has a learned spread. A track bonus grows only
+when a driver beats what his car *and* his general level predict at that circuit again and
+again, over seasons and against different teammates. The heavy-tailed prior keeps most
+bonuses near zero without flattening a genuine specialist. On synthetic data (a known 1.0%
+mid-season upgrade, one driver 0.4% faster at one circuit) the model recovers both.
+Number of visits is stored with every track bonus (`n_samples`).
+
+**What came out (cutoff 2026-11-19):** Verstappen is the best qualifier and racer net of the
+car; Mercedes was the fastest 2026 car, Red Bull improved from −0.26% (round 1) to −0.76%
+(round 8) in qualifying. Largest qualifying track bonuses: Pérez/Baku, Bottas/Hungary,
+Albon/Monaco, Alonso/Singapore; race: Hamilton/Barcelona, Vettel/Singapore,
+Räikkönen/Hungary.
+
+**In the simulator** (`sim/field_inputs.py`): car pace = the car at its latest round (+ one
+round of upgrade uncertainty; a new season starts from last year's final car ± 0.6%), plus
+its car × track-type strength; driver pace = skill + track-type bonus + this-circuit bonus.
+Weekend form left over on top: 0.28% (qualifying) / 0.22% (race), from the shared deviation
+of teammates (0.34% / 0.28% before removing upgrades and track type).
+
+Stored per cutoff in `gold.field_effects` (one row per effect, `effect = hyper:<name>` rows
+hold the learned spreads). A fit takes ~30 s per kind.
+
 ## Tyre models (2019+)
 
 - Per stint (≥8 clean laps), lap time is fuel-corrected (`100·ln t + 0.035·lap`) and

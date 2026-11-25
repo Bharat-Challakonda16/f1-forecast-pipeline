@@ -92,6 +92,7 @@ def simulate_event(
         car_z=car_z_race,
         skill_z=skill_z_race,
         n_replays=0,
+        quali_surprise=q.team_surprise,
         **calib.race_kwargs(),
     )
     gp_points = points_for(race.position, race.dnf, POINTS)
@@ -112,6 +113,7 @@ def simulate_event(
             skill_z=skill_z_race,
             n_replays=0,
             sprint=True,
+            quali_surprise=sq.team_surprise,
             **calib.race_kwargs(),
         )
         sprint_points = points_for(sr.position, sr.dnf, SPRINT_POINTS)

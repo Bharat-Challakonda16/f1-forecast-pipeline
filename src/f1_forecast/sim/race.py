@@ -35,7 +35,10 @@ from f1_forecast.sim.strategy import COMPOUNDS, candidate_plans, plan_probabilit
 POINTS = np.array([25, 18, 15, 12, 10, 8, 6, 4, 2, 1], float)
 LAP_NOISE_PCT = 0.30  # clean-lap variation for an average-consistency driver
 MIN_GAP_S = 0.25  # closest a car can follow at the line without passing
-START_NOISE_PLACES = 1.6  # spread of lap-1 place changes
+# Lap-1 place changes: spread grows down the grid (front rows are cleaner). Fitted to dry
+# races 2014-2026: P1 keeps the lead 71%, P2 its place 46%, P10 25%.
+START_NOISE_PLACES = 1.1
+START_NOISE_PER_SLOT = 0.045
 SC_LAP_FACTOR = 1.40
 VSC_LAP_FACTOR = 1.30
 SC_PIT_FACTOR = 0.45  # a stop under a safety car costs ~45% of a green stop
@@ -50,6 +53,41 @@ PASS_POWER = 1.5
 PASS_THRESHOLD_S = 0.20  # pace advantage (s/lap) needed before a pass is possible at all
 DIRTY_AIR_PCT = 0.25  # time lost per lap when following within DIRTY_AIR_GAP_S
 DIRTY_AIR_GAP_S = 1.0
+# Strategy realism. In dry races 2019-2026, 81% of the top 10 made the race's most common
+# number of stops: drivers follow the race's consensus stop count with this probability
+# (else they choose freely), so the simulated share matches.
+STRATEGY_FOLLOW = 0.75
+RACE_PIT_SHIFT = 3  # laps: whole-race shift of the pit windows
+DRIVER_PIT_JITTER = 2  # laps: individual offset on top
+# Undercut cover: if the car right behind (within COVER_GAP_S) pits, a car whose own stop is
+# due within COVER_LAPS laps pits on the next lap instead of losing the place.
+COVER_GAP_S = 3.0
+COVER_LAPS = 8
+# A team that qualifies 1% faster than expected is ~0.3% faster than expected in the race
+# (dry races 2014-2026: 0.25, 2022-2026: 0.34; regression on recent race form + the
+# qualifying surprise).
+QUALI_TO_RACE = 0.30
+
+
+def strategy_choices(
+    plans: list, probs: np.ndarray, sims: int, n: int, rng: np.random.Generator, *, follow: float
+) -> np.ndarray:
+    """(sims, n) plan index per driver: per race a consensus stop count is drawn; each driver
+    follows it with probability ``follow`` (choosing among plans with that many stops),
+    otherwise picks any plan."""
+    stops = np.array([p.stops for p in plans])
+    free = rng.choice(len(plans), size=(sims, n), p=probs)
+    if follow <= 0:
+        return free
+    consensus = stops[rng.choice(len(plans), size=sims, p=probs)]
+    out = free.copy()
+    for s in np.unique(consensus):
+        same = stops == s
+        p_s = np.where(same, probs, 0.0)
+        p_s = p_s / p_s.sum()
+        m = (consensus == s)[:, None] & (rng.random((sims, n)) < follow)
+        out[m] = rng.choice(len(plans), size=int(m.sum()), p=p_s)
+    return out
 
 
 @dataclass
@@ -108,11 +146,16 @@ def simulate_race(
     car_z: np.ndarray | None = None,
     skill_z: np.ndarray | None = None,
     sprint: bool = False,
+    strategy_follow: float = STRATEGY_FOLLOW,
+    cover: bool = True,
+    quali_surprise: np.ndarray | None = None,
 ) -> RaceResult:
     """``grid``: (sims, drivers) starting positions, e.g. ``QualiResult.grid``.
 
     ``car_z`` / ``skill_z``: optional shared standard-normal draws for estimate uncertainty
-    (see :func:`simulate_qualifying`). ``sprint``: short race, no compulsory stop."""
+    (see :func:`simulate_qualifying`). ``sprint``: short race, no compulsory stop.
+    ``quali_surprise``: (sims, teams) or (teams,) qualifying surprise per team (simulated or
+    observed); ``QUALI_TO_RACE`` of it carries into race pace."""
     rng = np.random.default_rng(seed)
     sims, n = grid.shape
     laps = int(circuit["laps"])
@@ -124,13 +167,16 @@ def simulate_race(
     k = drivers["constructor_id"].map(team_idx).to_numpy().astype(int)
 
     # ------------------------------------------------------------------ per-race draws
-    adj = track_type_adjustment(t, circuit.get("speed_profile")).to_numpy()
+    adj = track_type_adjustment(t, circuit.get("speed_profile"), kind="race").to_numpy()
     if car_z is None:
         car_z = rng.standard_normal((sims, len(t)))
     if skill_z is None:
         skill_z = rng.standard_normal((sims, n))
     car = t["car_race"].to_numpy(float) + t["car_race_se"].to_numpy(float) * car_z
-    form = rng.normal(0.0, t["form_sd"].to_numpy(float), (sims, len(t)))
+    form_sd = t["form_sd_race"] if "form_sd_race" in t else t["form_sd"]
+    form = rng.normal(0.0, form_sd.to_numpy(float), (sims, len(t)))
+    if quali_surprise is not None:
+        form = form + QUALI_TO_RACE * np.broadcast_to(quali_surprise, (sims, len(t)))
     skill = drivers["race_pace"].to_numpy(float) + drivers["race_pace_se"].to_numpy(float) * skill_z
     pace = (car + form + adj)[:, k] + skill  # % lap, lower = faster
     noise_sd = LAP_NOISE_PCT * np.exp(drivers["consistency"].fillna(0).to_numpy(float) / 100)
@@ -146,14 +192,19 @@ def simulate_race(
         sprint=sprint,
     )
     probs = plan_probabilities(plans)
-    choice = rng.choice(len(plans), size=(sims, n), p=probs)
+    choice = strategy_choices(plans, probs, sims, n, rng, follow=strategy_follow)
     max_stops = max(p.stops for p in plans)
     pit_lap = np.full((sims, n, max(max_stops, 1)), laps + 99)  # keep a slot even if no stops
     seq = np.zeros((sims, n, max_stops + 1), int)
+    # pit windows move together in a race (track evolution, tyre life on the day) with a
+    # smaller individual offset per driver
+    race_shift = rng.integers(-RACE_PIT_SHIFT, RACE_PIT_SHIFT + 1, size=(sims, 1))
     for i, p in enumerate(plans):
         m = choice == i
         for s_i, lap_i in enumerate(p.pit_laps):
-            jitter = rng.integers(-3, 4, size=m.sum())
+            jitter = np.broadcast_to(race_shift, (sims, n))[m] + rng.integers(
+                -DRIVER_PIT_JITTER, DRIVER_PIT_JITTER + 1, size=m.sum()
+            )
             pit_lap[m, s_i] = np.clip(lap_i + jitter, 2, laps - 2)
         for c_i, comp in enumerate(p.compounds):
             seq[m, c_i] = comp
@@ -207,7 +258,8 @@ def simulate_race(
 
     # ------------------------------------------------------------------ lap 1
     start_skill = drivers["starts"].fillna(0).to_numpy(float)  # places lost on lap 1
-    order_score = grid + start_skill + rng.normal(0, START_NOISE_PLACES, (sims, n))
+    start_sd = START_NOISE_PLACES + START_NOISE_PER_SLOT * (grid - 1)
+    order_score = grid + start_skill + rng.normal(0, 1, (sims, n)) * start_sd
     order = order_score.argsort(axis=1)
     cum = np.empty((sims, n))
     rows = np.arange(sims)[:, None]
@@ -229,8 +281,20 @@ def simulate_race(
     n_passes, n_green = 0, 0
 
     # ------------------------------------------------------------------ laps 2..N
+    prev_pitting = np.zeros((sims, n), bool)
+    prev_behind = np.zeros((sims, n), int)
+    prev_gap_behind = np.full((sims, n), np.inf)
     for lap in range(2, laps + 1):
         alive &= dnf_lap > lap
+        # who is right behind each car at the start of this lap, and how close
+        o = np.where(alive, cum, np.inf).argsort(axis=1)
+        behind_o = np.concatenate([o[:, 1:], o[:, -1:]], axis=1)
+        cum_o = np.take_along_axis(cum, o, axis=1)
+        gap_o = np.concatenate([np.diff(cum_o, axis=1), np.full((sims, 1), np.inf)], axis=1)
+        behind_now = np.empty_like(o)
+        np.put_along_axis(behind_now, o, behind_o, axis=1)
+        gap_behind_now = np.empty_like(cum)
+        np.put_along_axis(gap_behind_now, o, gap_o, axis=1)
         compound = np.take_along_axis(seq, stint[:, :, None], axis=2)[:, :, 0]
         tyre = offset[compound] + (wear[compound] + driver_wear) * age
         lap_pct = pace + tyre + rng.normal(0, 1, (sims, n)) * noise_sd
@@ -246,7 +310,20 @@ def simulate_race(
         opportunistic = (
             has_stop & (due - lap <= 8) & (due > lap) & (sc_now | vsc_now | red_now)[:, None]
         )
-        pitting = alive & (planned | opportunistic)
+        # covering the undercut: the car right behind (close at the start of the last lap)
+        # pitted last lap and our own stop is due soon -> respond now
+        covering = np.zeros_like(planned)
+        if cover and lap > 2:
+            rival_pitted = np.take_along_axis(prev_pitting, prev_behind, axis=1)
+            covering = (
+                has_stop
+                & rival_pitted
+                & (prev_gap_behind < COVER_GAP_S * 1000)
+                & (due > lap)
+                & (due - lap <= COVER_LAPS)
+                & ~prev_pitting
+            )
+        pitting = alive & (planned | opportunistic | covering)
         loss = np.where(
             red_now[:, None],
             0.0,
@@ -258,6 +335,7 @@ def simulate_race(
         stint = np.where(pitting, np.minimum(stint + 1, max_stops), stint)
         age = np.where(pitting, 0, age) + 1
         stops += pitting
+        prev_pitting, prev_behind, prev_gap_behind = pitting, behind_now, gap_behind_now
 
         neutral = sc_now | vsc_now
         lap_ms = np.where(
