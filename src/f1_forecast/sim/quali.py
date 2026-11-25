@@ -1,0 +1,94 @@
+"""Monte Carlo qualifying: pole and grid-position probabilities.
+
+For each simulated session ``s`` and driver ``i`` (team ``k``)::
+
+    lap_pct[s, i] = car_quali[k] ~ N(estimate, se)          # what we know about the car
+                  + form[s, k]   ~ N(0, team form sd)        # how it works on this weekend
+                  + track_type_adj[k]                        # strength at this kind of track
+                  + skill[i]     ~ N(trait value, trait se)  # the driver
+                  + execution[s, i] ~ N(0, EXECUTION_SD)     # nailing the lap (or not)
+
+The grid is the order of ``lap_pct``. Every draw also samples the *uncertainty of the
+estimates*, so a team or driver we know little about gets a wider spread of outcomes.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
+
+EXECUTION_SD = 0.15  # % lap: driver-level variation in a single qualifying lap
+TRACK_TYPE_WEIGHT = 0.5  # track-type strength is noisy: use half of the measured offset
+
+
+@dataclass
+class QualiResult:
+    driver_ids: list[str]
+    grid: np.ndarray  # (sims, drivers): grid position (1 = pole) of each driver per sim
+    pace: np.ndarray  # (sims, drivers): simulated lap deficit, %
+
+    def summary(self) -> pd.DataFrame:
+        g = self.grid
+        n = g.shape[1]
+        out = pd.DataFrame(
+            {
+                "driver_id": self.driver_ids,
+                "p_pole": (g == 1).mean(axis=0),
+                "p_front_row": (g <= 2).mean(axis=0),
+                "p_top3": (g <= 3).mean(axis=0),
+                "p_top10": (g <= 10).mean(axis=0),
+                "expected_grid": g.mean(axis=0),
+            }
+        )
+        dist = np.stack([(g == p).mean(axis=0) for p in range(1, n + 1)], axis=1)
+        out["grid_distribution"] = list(dist)
+        return out.sort_values("expected_grid").reset_index(drop=True)
+
+
+def track_type_adjustment(teams: pd.DataFrame, speed_profile: str | None) -> pd.Series:
+    col = {
+        "high": "high_speed_track_idx",
+        "low": "low_speed_track_idx",
+        "medium": "medium_speed_track_idx",
+        "mixed": "medium_speed_track_idx",
+    }.get(speed_profile or "")
+    if col is None or col not in teams:
+        return pd.Series(0.0, index=teams.index)
+    return TRACK_TYPE_WEIGHT * pd.to_numeric(teams[col]).fillna(0.0)
+
+
+def simulate_qualifying(
+    drivers: pd.DataFrame,
+    teams: pd.DataFrame,
+    *,
+    speed_profile: str | None = None,
+    sims: int = 10_000,
+    seed: int = 2027,
+    execution_sd: float = EXECUTION_SD,
+) -> QualiResult:
+    """``drivers``: driver_id, constructor_id, quali_pace, quali_pace_se.
+    ``teams``: constructor_id, car_quali, car_quali_se, form_sd (+ optional track idx)."""
+    rng = np.random.default_rng(seed)
+    t = teams.reset_index(drop=True)
+    team_idx = {c: i for i, c in enumerate(t["constructor_id"])}
+    k = drivers["constructor_id"].map(team_idx).to_numpy()
+    if np.isnan(k.astype(float)).any():
+        raise ValueError("every driver's constructor_id must be in teams")
+    k = k.astype(int)
+
+    adj = track_type_adjustment(t, speed_profile).to_numpy()
+    car = rng.normal(
+        t["car_quali"].to_numpy(float), t["car_quali_se"].to_numpy(float), (sims, len(t))
+    )
+    form = rng.normal(0.0, t["form_sd"].to_numpy(float), (sims, len(t)))
+    skill = rng.normal(
+        drivers["quali_pace"].to_numpy(float),
+        drivers["quali_pace_se"].to_numpy(float),
+        (sims, len(drivers)),
+    )
+    execution = rng.normal(0.0, execution_sd, (sims, len(drivers)))
+    pace = (car + form + adj)[:, k] + skill + execution
+    grid = pace.argsort(axis=1).argsort(axis=1) + 1
+    return QualiResult(drivers["driver_id"].tolist(), grid, pace)
