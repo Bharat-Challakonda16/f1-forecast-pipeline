@@ -1,7 +1,7 @@
 name: Fit features
 
 # Fits the Bayesian driver-trait models on fresh data and stores a new version in
-# gold.driver_traits. Weekly after race weekends (after Jolpica + silver), or on demand,
+# gold.driver_traits, then updates the telemetry corner-speed profiles (new sessions only). Weekly after race weekends (after Jolpica + silver), or on demand,
 # optionally with an earlier data cutoff for backtests.
 on:
   workflow_dispatch:
@@ -53,3 +53,8 @@ jobs:
             python -m f1_forecast.features.run_traits --trait "$t" $as_of_arg
             echo "::endgroup::"
           done
+
+      - name: Corner speeds (new qualifying sessions) + season profiles
+        run: |
+          python -m f1_forecast.features.run_corners
+          python -m f1_forecast.ops.run_sql databricks/sql/gold --only 42_car_corner_profiles.sql
