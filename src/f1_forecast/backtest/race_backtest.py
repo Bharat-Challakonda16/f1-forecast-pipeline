@@ -37,18 +37,9 @@ from f1_forecast.features.run_field import MODEL_VERSION as FIELD_VERSION
 from f1_forecast.features.run_field import run as fit_field
 from f1_forecast.features.run_traits import CATALOG, OUTPUT_VOLUME, TRAITS, execute, query_df
 from f1_forecast.features.run_traits import run as fit_trait
-from f1_forecast.sim.blend import (
-    GRID_BLEND,
-    QUALI_BLEND,
-    QUALI_COLS,
-    blend,
-    blend_many,
-    grid_prior,
-)
+from f1_forecast.sim.blend import QUALI_BLEND, QUALI_COLS, blend_many
 from f1_forecast.sim.inputs import load_event_inputs
-from f1_forecast.sim.practice import apply_practice, practice_surprise
-from f1_forecast.sim.quali import observed_team_surprise, simulate_qualifying
-from f1_forecast.sim.race import calibrate_pass_k, simulate_race
+from f1_forecast.sim.weekend import simulate_weekend
 
 log = logging.getLogger(__name__)
 # sim_v2: shared estimate draws for qualifying and race, qualifying surprise carried into
@@ -251,54 +242,7 @@ def predict_round(
     ev.teams = ev.teams[ev.teams["constructor_id"].isin(ev.drivers["constructor_id"])].reset_index(
         drop=True
     )
-    # One draw of "how wrong are our estimates" per simulation, shared by qualifying and the
-    # race (same car, same drivers).
-    rng = np.random.default_rng(2027)
-    car_z = rng.standard_normal((sims, len(ev.teams)))
-    skill_z = rng.standard_normal((sims, len(ev.drivers)))
-    q = simulate_qualifying(
-        ev.drivers,
-        ev.teams,
-        speed_profile=ev.circuit["speed_profile"],
-        sims=sims,
-        car_z=car_z,
-        skill_z=skill_z,
-    )
-    calib = calibrate_pass_k(ev.drivers, ev.teams, ev.tyres, ev.circuit, q.grid)
-    pre = simulate_race(
-        ev.drivers,
-        ev.teams,
-        ev.tyres,
-        ev.circuit,
-        q.grid,
-        n_replays=0,
-        car_z=car_z,
-        skill_z=skill_z,
-        quali_surprise=q.team_surprise,
-        **calib.race_kwargs(),
-    )
-    # after practice: same estimate draws, car / driver pace shifted by practice
-    fp = practice if practice is not None else pd.DataFrame()
-    dp, tp = apply_practice(ev.drivers, ev.teams, practice_surprise(ev.drivers, ev.teams, fp))
-    qp = simulate_qualifying(
-        dp, tp, speed_profile=ev.circuit["speed_profile"], sims=sims, car_z=car_z, skill_z=skill_z
-    )
-    pp = simulate_race(
-        dp,
-        tp,
-        ev.tyres,
-        ev.circuit,
-        qp.grid,
-        seed=9,
-        n_replays=0,
-        car_z=car_z,
-        skill_z=skill_z,
-        quali_surprise=qp.team_surprise,
-        **calib.race_kwargs(),
-    )
     best = actual.set_index("driver_id")["quali_best_ms"].astype(float)
-    quali_pct = 100 * np.log(best / best.median())
-    surprise = observed_team_surprise(ev.drivers, ev.teams, quali_pct, ev.circuit["speed_profile"])
     grid_actual = (
         actual.set_index("driver_id")["grid"]
         .reindex(ev.drivers["driver_id"])
@@ -308,45 +252,18 @@ def predict_round(
         .to_numpy()
         .astype(int)
     )
-    post = simulate_race(
-        ev.drivers,
-        ev.teams,
-        ev.tyres,
-        ev.circuit,
-        np.tile(grid_actual, (sims, 1)),
-        seed=7,
-        n_replays=0,
-        car_z=car_z,
-        skill_z=skill_z,
-        quali_surprise=surprise,
-        **calib.race_kwargs(),
+    wf = simulate_weekend(
+        ev,
+        sims,
+        practice=practice if practice is not None else pd.DataFrame(),
+        grid=grid_actual,
+        quali_pct=100 * np.log(best / best.median()),
+        grid_table=grid_table,
     )
-
-    def qsum(r):
-        return (
-            r.summary().drop(columns="grid_distribution").rename(columns={"p_top3": "p_top3_grid"})
-        )
-
-    rows = []
-    for stage, res, g, qs in (
-        ("pre_weekend", pre, q.grid, qsum(q)),
-        ("post_practice", pp, qp.grid, qsum(qp)),
-        ("post_quali", post, grid_actual, None),
-    ):
-        s = res.summary()
-        if grid_table is not None:
-            prior = grid_prior(g, grid_table)
-            prior["driver_id"] = res.driver_ids
-            prior = prior.set_index("driver_id").reindex(s["driver_id"]).reset_index()
-            s = blend(s, prior, GRID_BLEND[stage])
-        if qs is not None:
-            s = s.merge(qs, on="driver_id", how="left")
-        s["stage"] = stage
-        rows.append(s)
-    pred = pd.concat(rows, ignore_index=True)
+    pred = wf.pred
     pred["season"], pred["round"], pred["data_cutoff"] = season, rnd, as_of
     pred["circuit_id"] = ev.circuit["circuit_id"]
-    pred["pass_k"], pred["slipstream"] = calib.k, calib.slipstream
+    pred["pass_k"], pred["slipstream"] = wf.pass_k, wf.slipstream
     return pred, ev
 
 
