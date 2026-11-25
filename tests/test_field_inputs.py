@@ -105,6 +105,22 @@ def test_new_season_rookie_and_new_team():
     assert d.loc["rookie", "quali_pace"] == 0.0 and d.loc["rookie", "quali_pace_se"] == 0.3
 
 
+def test_second_season_driver_gets_young_step():
+    e = effects()
+    extra = []
+    for kind in ("quali", "race"):
+        extra += [
+            {"kind": kind, "effect": "debut", "driver_id": "hadjar", "value": 2025.0},
+            {"kind": kind, "effect": "hyper:sigma_young[0]", "value": 0.3},
+            {"kind": kind, "effect": "hyper:drift_young[0]", "value": -0.2},
+        ]
+    e = pd.concat([e, pd.DataFrame(extra)], ignore_index=True)
+    d, _ = apply_field_effects(e, *frames(), season=2026, circuit_id="monza", speed_profile="high")
+    h = d.set_index("driver_id").loc["hadjar"]
+    assert np.isclose(h["quali_pace"], -0.2 - 0.2)  # 2025 level + mean 2nd-year improvement
+    assert np.isclose(h["quali_pace_se"], np.hypot(0.1, 0.3))
+
+
 def test_scale_retirements_matches_field_rate_and_keeps_order():
     from f1_forecast.sim.inputs import LAP1_RETIRE_SHARE, scale_retirements
 

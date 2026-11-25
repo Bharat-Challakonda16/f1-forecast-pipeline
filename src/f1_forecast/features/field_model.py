@@ -9,7 +9,9 @@ lap): ``pace = 100 * ln(time / session median)`` (% of lap time, lower = faster)
             + car[team-season, round]           # car speed AT THAT ROUND: a random walk through
                                                 #   the season, so upgrades show up as steps
             + car_type[team-season, track type] # this car's strength on this kind of track
-            + skill[driver, season]             # the driver: career random walk (as before)
+            + skill[driver, season]             # the driver: career random walk; the steps into
+                                                #   the 2nd and 3rd season have their own spread
+                                                #   and mean (young drivers improve fast)
             + driver_type[driver, track type]   # driver strength on this kind of track
             + driver_track[driver, circuit]     # driver strength at this very circuit
 
@@ -50,6 +52,30 @@ class FieldData:
     meta: dict[str, Any] = field(default_factory=dict)
 
 
+def experience_index(career_year: np.ndarray) -> np.ndarray:
+    """Which year-to-year step a season uses: 1 = into the 2nd season, 2 = into the 3rd,
+    0 = later (the general career walk)."""
+    cy = np.asarray(career_year)
+    return np.select([cy == 2, cy == 3], [1, 2], 0)
+
+
+def experience_walk(keys: pd.DataFrame, sigma_driver, sigma_walk, sigma_young, drift_young):
+    """Career random walk of skill (as ``career_random_walk``) where the steps into a
+    driver's 2nd and 3rd seasons have their own spread and mean (young drivers improve)."""
+    import pymc as pm
+    import pytensor.tensor as pt
+
+    z = pm.Normal("z_skill", 0, 1, shape=len(keys))
+    e = keys["exp_i"].to_numpy()
+    sig = pt.concatenate([pt.stack([sigma_walk]), sigma_young])[e]
+    drift = pt.concatenate([pt.zeros(1), drift_young])[e]
+    gap = pt.sqrt(keys["year_gap"].to_numpy().astype(float))
+    step = pt.where(keys["is_first"].to_numpy(), sigma_driver * z, drift + sig * gap * z)
+    csum = pt.cumsum(step)
+    offset = pt.concatenate([pt.zeros(1), csum])[keys["start_idx"].to_numpy()]
+    return pm.Deterministic("skill", csum - offset)
+
+
 def _index(values: pd.Series | pd.MultiIndex) -> tuple[pd.Index, np.ndarray]:
     uniq = pd.Index(pd.unique(values))
     return uniq, uniq.get_indexer(values)
@@ -87,7 +113,16 @@ def prepare(df: pd.DataFrame) -> FieldData:
         pd.MultiIndex.from_arrays([d["team_season"], d["speed_profile"]])
     )
 
+    # career year (1 = debut season) for the experience-dependent skill walk; without a
+    # known debut, the first season in the data counts as the debut
+    first = d.groupby("driver_id")["season"].transform("min")
+    debut = pd.to_numeric(d["debut"]) if "debut" in d else first
+    d["debut"] = np.minimum(debut.fillna(first), first).astype(int)
     skill = career_keys(d[["driver_id", "season"]].drop_duplicates())
+    skill["career_year"] = (
+        skill["season"] - skill["driver_id"].map(d.groupby("driver_id")["debut"].min()) + 1
+    )
+    skill["exp_i"] = experience_index(skill["career_year"].to_numpy())
     spos = {
         (a, s): i for i, (a, s) in enumerate(zip(skill["driver_id"], skill["season"], strict=True))
     }
@@ -137,7 +172,10 @@ def build_model(data: FieldData):
 
         sigma_driver = pm.HalfNormal("sigma_driver", 1.0)
         sigma_walk = pm.HalfNormal("sigma_walk", 0.3)
-        skill = career_random_walk(data.skill_keys, sigma_driver, sigma_walk, name="skill")
+        # steps into the 2nd and 3rd season: own spread and mean change (lower = faster)
+        sigma_young = pm.HalfNormal("sigma_young", 0.4, shape=2)
+        drift_young = pm.Normal("drift_young", 0, 0.3, shape=2)
+        skill = experience_walk(data.skill_keys, sigma_driver, sigma_walk, sigma_young, drift_young)
 
         sigma_driver_type = pm.HalfNormal("sigma_driver_type", 0.15)
         z_dt = pm.StudentT("z_driver_type", nu=3, mu=0, sigma=1, shape=len(data.driver_types))
@@ -174,6 +212,8 @@ HYPER = [
     "sigma_car_type",
     "sigma_driver",
     "sigma_walk",
+    "sigma_young",
+    "drift_young",
     "sigma_driver_type",
     "sigma_track",
 ]
@@ -249,6 +289,11 @@ def fit(
     parts[-1]["n_samples"] = visits.reindex(
         pd.MultiIndex.from_frame(parts[-1][["driver_id", "circuit_id"]])
     ).to_numpy()
+    # debut season per driver, so forecasts know which year-to-year step comes next
+    deb = data.obs.groupby("driver_id")["debut"].min()
+    parts.append(
+        pd.DataFrame({"effect": "debut", "driver_id": deb.index, "value": deb.to_numpy(float)})
+    )
     effects = pd.concat(parts, ignore_index=True)
 
     summary = az.summary(idata, var_names=HYPER)

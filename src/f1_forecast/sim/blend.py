@@ -20,8 +20,9 @@ import pandas as pd
 COLS = ("p_win", "p_podium", "p_points")
 # Learned on the 2025 season (backtest/tune.py --blend, lowest winner log loss), tested on
 # 2026. From the actual grid the slot history carries most of the information (log loss
-# 1.398 simulation only, 1.116 grid only, 1.104 at 0.85); before the weekend, a little helps.
-GRID_BLEND = {"post_quali": 0.85, "pre_weekend": 0.15}
+# 1.364 simulation only, 1.116 grid only, 1.105 at 0.85); before the weekend it doesn't
+# help once young drivers' development is modelled (1.727 at 0, worse above).
+GRID_BLEND = {"post_quali": 0.85, "pre_weekend": 0.0}
 
 
 def grid_prior(grid: np.ndarray, table: pd.DataFrame) -> pd.DataFrame:
@@ -38,6 +39,30 @@ def grid_prior(grid: np.ndarray, table: pd.DataFrame) -> pd.DataFrame:
     df = pd.DataFrame(out)
     df["p_win"] = df["p_win"] / df["p_win"].sum()
     return df
+
+
+QUALI_COLS = ("p_pole", "p_top3_grid", "p_top10")
+# Pole chances before the weekend: weights of the simple qualifying baselines (frequencies
+# by last qualifying position / championship position), learned on 2025 (tune.py --quali:
+# pole log loss 1.89 at these weights).
+QUALI_BLEND = {"previous_quali": 0.40, "championship": 0.25}
+
+
+def blend_many(
+    sim: pd.DataFrame, priors: dict[str, pd.DataFrame], weights: dict[str, float], cols
+) -> pd.DataFrame:
+    """``(1 - sum w) * sim + sum w_k * prior_k`` for ``cols`` (first column = a single
+    winner, renormalised). Rows in the same driver order; a missing prior's weight goes back
+    to ``sim``."""
+    out = sim.copy()
+    used = {k: weights.get(k, 0.0) for k in priors}
+    for c in cols:
+        v = (1 - sum(used.values())) * sim[c].to_numpy(float)
+        for k, p in priors.items():
+            v = v + used[k] * p[c].to_numpy(float)
+        out[c] = v
+    out[cols[0]] = out[cols[0]] / out[cols[0]].sum()
+    return out
 
 
 def blend(sim: pd.DataFrame, prior: pd.DataFrame, w: float) -> pd.DataFrame:

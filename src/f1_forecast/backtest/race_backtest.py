@@ -37,7 +37,14 @@ from f1_forecast.features.run_field import MODEL_VERSION as FIELD_VERSION
 from f1_forecast.features.run_field import run as fit_field
 from f1_forecast.features.run_traits import CATALOG, OUTPUT_VOLUME, TRAITS, execute, query_df
 from f1_forecast.features.run_traits import run as fit_trait
-from f1_forecast.sim.blend import GRID_BLEND, blend, grid_prior
+from f1_forecast.sim.blend import (
+    GRID_BLEND,
+    QUALI_BLEND,
+    QUALI_COLS,
+    blend,
+    blend_many,
+    grid_prior,
+)
 from f1_forecast.sim.inputs import load_event_inputs
 from f1_forecast.sim.quali import observed_team_surprise, simulate_qualifying
 from f1_forecast.sim.race import calibrate_pass_k, simulate_race
@@ -48,7 +55,8 @@ log = logging.getLogger(__name__)
 # sim_v3: + joint field model (car per round incl. upgrades, driver x track bonuses).
 # sim_v4: + lap-1 spread growing down the grid, retirement rates scaled to the field level.
 # sim_v5: + race-pace spread x0.7, blended with grid-slot frequencies (both tuned on 2025).
-MODEL_VERSION = "sim_v5"
+# sim_v6: + young drivers' faster year-to-year change (field_rw_v2), pole blend.
+MODEL_VERSION = "sim_v6"
 
 
 @dataclass
@@ -149,12 +157,15 @@ def baseline_ranks(hist: pd.DataFrame, season: int, rnd: int, drivers: list[str]
 
 
 def frequency_tables(hist: pd.DataFrame, season: int) -> dict[str, pd.DataFrame]:
-    """P(win / podium / points | baseline rank) from the four seasons before ``season``."""
+    """P(win / podium / points | baseline rank) from the four seasons before ``season``.
+    ``previous_quali`` and ``championship_quali`` are about qualifying (pole / top 3 /
+    top 10), the others about the race."""
     tables: dict[str, list] = {
         "championship": [],
         "previous_race": [],
         "grid": [],
         "previous_quali": [],
+        "championship_quali": [],
     }
     races = hist[
         (hist["session_code"] == "R") & (hist["season"] < season) & (hist["season"] >= season - 4)
@@ -164,8 +175,9 @@ def frequency_tables(hist: pd.DataFrame, season: int) -> dict[str, pd.DataFrame]
         ranks = baseline_ranks(hist, int(s), int(r), drivers)
         pos = g["position"].to_numpy()
         qpos = g["quali_position"].to_numpy()
+        ranks["championship_quali"] = ranks["championship"]
         for name, rk in ranks.items():
-            if name == "previous_quali":
+            if name.endswith("_quali"):
                 tables[name] += [
                     (k, float(q == 1), float(q <= 3), float(q <= 10))
                     for k, q in zip(rk, qpos, strict=True)
@@ -180,6 +192,29 @@ def frequency_tables(hist: pd.DataFrame, season: int) -> dict[str, pd.DataFrame]
     for name, rows in tables.items():
         df = pd.DataFrame(rows, columns=["rank", "p_win", "p_podium", "p_points"])
         out[name] = df.groupby("rank").mean().reset_index()
+    return out
+
+
+def quali_priors(
+    hist: pd.DataFrame, freq: dict, season: int, rnd: int, drivers: list[str]
+) -> dict[str, pd.DataFrame]:
+    """Qualifying baselines as probabilities (p_pole, p_top3_grid, p_top10, expected_grid)
+    for ``drivers`` in that order: last qualifying order, championship order."""
+    ranks = baseline_ranks(hist, season, rnd, drivers)
+    out = {}
+    for name, table in (
+        ("championship", "championship_quali"),
+        ("previous_quali", "previous_quali"),
+    ):
+        if name in ranks:
+            out[name] = rank_baseline_probs(ranks[name], freq[table]).rename(
+                columns={
+                    "p_win": "p_pole",
+                    "p_podium": "p_top3_grid",
+                    "p_points": "p_top10",
+                    "expected_position": "expected_grid",
+                }
+            )
     return out
 
 
@@ -335,6 +370,11 @@ def run(
         pred, ev = predict_round(
             ctx, season, rnd, as_of, sims, actual, use_field, grid_table=freq["grid"]
         )
+        pre = pred["stage"] == "pre_weekend"
+        priors = quali_priors(hist, freq, season, rnd, pred.loc[pre, "driver_id"].tolist())
+        pred.loc[pre, list(QUALI_COLS)] = blend_many(
+            pred.loc[pre].reset_index(drop=True), priors, QUALI_BLEND, QUALI_COLS
+        )[list(QUALI_COLS)].to_numpy()
         pred["snapshot_id"] = pred["stage"] + f":{season}_{rnd:02d}:{as_of}:{model_version}"
         pred["model_version"], pred["created_at"] = model_version, created
         all_preds.append(pred)
@@ -376,26 +416,18 @@ def run(
                     **event_scores(p, kind="quali"),
                 }
             )
-            ranks = baseline_ranks(hist, season, rnd, p["driver_id"].tolist())
-            for name in ("championship", "previous_quali"):
-                if name in ranks:
-                    b = rank_baseline_probs(ranks[name], freq[name]).rename(
-                        columns={
-                            "p_win": "p_pole",
-                            "p_podium": "p_top3_grid",
-                            "expected_position": "expected_grid",
-                        }
-                    )
-                    b["actual_rank"] = p["actual_rank"].to_numpy()
-                    all_scores.append(
-                        {
-                            "round": rnd,
-                            "stage": "qualifying",
-                            "method": name,
-                            "kind": "quali",
-                            **event_scores(b, kind="quali"),
-                        }
-                    )
+            priors = quali_priors(hist, freq, season, rnd, p["driver_id"].tolist())
+            for name, b in priors.items():
+                b = b.assign(actual_rank=p["actual_rank"].to_numpy())
+                all_scores.append(
+                    {
+                        "round": rnd,
+                        "stage": "qualifying",
+                        "method": name,
+                        "kind": "quali",
+                        **event_scores(b, kind="quali"),
+                    }
+                )
         log.info(
             "round %d (%s) done in %.0fs; fitted %s",
             rnd,

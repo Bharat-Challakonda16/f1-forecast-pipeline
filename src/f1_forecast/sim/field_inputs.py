@@ -17,6 +17,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from f1_forecast.features.field_model import experience_index
+
 NEW_SEASON_CAR_SD = 0.6  # % lap: how far a car can move over a winter (rule changes: more)
 ROOKIE_SKILL_SD = 0.3
 # Remaining weekend-to-weekend team form once car-per-round and car x track type are
@@ -66,7 +68,11 @@ def driver_inputs(
     skill = e[e["effect"] == "skill"]
     dtype = e[e["effect"] == "driver_type"].set_index(["driver_id", "speed_profile"])
     dtrack = e[e["effect"] == "driver_track"].set_index(["driver_id", "circuit_id"])
-    walk = _hyper(e, "sigma_walk", 0.1)
+    # year-to-year step: general, into the 2nd season, into the 3rd (field_model)
+    step_sd = [_hyper(e, "sigma_walk", 0.1)]
+    step_sd += [_hyper(e, f"sigma_young[{i}]", step_sd[0]) for i in (0, 1)]
+    step_mean = [0.0] + [_hyper(e, f"drift_young[{i}]", 0.0) for i in (0, 1)]
+    debut = e[e["effect"] == "debut"].set_index("driver_id")["value"]
     rows = []
     for d in drivers:
         s = skill[(skill["driver_id"] == d) & (skill["season"] <= season)]
@@ -75,7 +81,12 @@ def driver_inputs(
         else:
             last = s.loc[s["season"].idxmax()]
             gap = season - int(last["season"])
-            sk, sk_se = float(last["value"]), float(np.hypot(last["std_err"], walk * np.sqrt(gap)))
+            sk, sk_se = float(last["value"]), float(last["std_err"])
+            if gap > 0:
+                first = debut.get(d, last["season"])
+                k = int(experience_index(np.array([season - first + 1]))[0])
+                sk += step_mean[k]
+                sk_se = float(np.hypot(sk_se, step_sd[k] * np.sqrt(gap)))
         ty, ty_se = _pick(dtype, (d, speed_profile))
         tr, tr_se = _pick(dtrack, (d, circuit_id))
         visits = dtrack["n_samples"].get((d, circuit_id), 0.0) if "n_samples" in dtrack else 0.0

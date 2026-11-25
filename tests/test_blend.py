@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from f1_forecast.sim.blend import blend, grid_prior
+from f1_forecast.sim.blend import blend, blend_many, grid_prior
 
 TABLE = pd.DataFrame(
     {
@@ -42,3 +42,15 @@ def test_blend_weights_and_keeps_other_columns():
     assert np.allclose(out["p_win"], [0.4, 0.6])
     assert list(out["driver_id"]) == ["a", "b"]
     assert blend(sim, prior, 0.0)["p_win"].equals(sim["p_win"])
+
+
+def test_blend_many_weights_and_missing_prior():
+    sim = pd.DataFrame({"p_pole": [0.5, 0.5], "p_top3_grid": [0.8, 0.8]})
+    pq = pd.DataFrame({"p_pole": [1.0, 0.0], "p_top3_grid": [1.0, 0.6]})
+    cols = ("p_pole", "p_top3_grid")
+    out = blend_many(
+        sim, {"previous_quali": pq}, {"previous_quali": 0.5, "championship": 0.3}, cols
+    )
+    # championship weight is unused (no prior) and stays with the simulation
+    assert np.allclose(out["p_pole"], [0.75, 0.25])
+    assert np.allclose(out["p_top3_grid"], [0.9, 0.7])

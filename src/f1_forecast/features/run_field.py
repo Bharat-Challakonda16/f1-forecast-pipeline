@@ -23,15 +23,21 @@ from f1_forecast.features.run_traits import CATALOG, OUTPUT_VOLUME, execute, que
 
 log = logging.getLogger(__name__)
 
-MODEL_VERSION = "field_rw_v1"
+# v2: young drivers (2nd / 3rd season) get their own year-to-year spread and mean improvement
+MODEL_VERSION = "field_rw_v2"
 FIRST_SEASON = 2010  # comparable lap times (no refuelling) and enough seasons for track effects
 KINDS = ("quali", "race")
 
 QUERY = """
-    SELECT season, round, circuit_id, speed_profile, driver_id, constructor_id, pace_pct
-    FROM {catalog}.gold.driver_session_pace
-    WHERE kind = '{kind}' AND NOT is_wet AND NOT is_outlier
-      AND season >= {first_season} AND race_date < DATE'{as_of}'
+    SELECT p.season, p.round, p.circuit_id, p.speed_profile, p.driver_id, p.constructor_id,
+           p.pace_pct, d.debut
+    FROM {catalog}.gold.driver_session_pace p
+    LEFT JOIN (
+      SELECT driver_id, min(season) AS debut FROM {catalog}.silver.results
+      WHERE session_code = 'R' GROUP BY driver_id
+    ) d ON d.driver_id = p.driver_id
+    WHERE p.kind = '{kind}' AND NOT p.is_wet AND NOT p.is_outlier
+      AND p.season >= {first_season} AND p.race_date < DATE'{as_of}'
 """
 
 COLUMNS = [

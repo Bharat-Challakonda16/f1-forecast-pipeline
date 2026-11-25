@@ -14,7 +14,11 @@ Default mode, a grid over:
 
 Scored by the winner's log loss and the win Brier score (lower is better).
 
+``--quali MODEL_VERSION``: weights of the qualifying baselines in the pole blend, from
+that version's stored pre-weekend predictions (no simulation).
+
     python -m f1_forecast.backtest.tune --season 2025 [--sims 2000] [--blend]
+    python -m f1_forecast.backtest.tune --season 2025 --quali sim_v6
 """
 
 from __future__ import annotations
@@ -152,6 +156,54 @@ def score_blend(ev, a: pd.DataFrame, sims: int, table: pd.DataFrame) -> list[dic
     return rows
 
 
+def run_quali(season: int, model_version: str) -> pd.DataFrame:
+    """Weights of the qualifying baselines in the pole blend, from the stored (unblended)
+    pre-weekend predictions of ``model_version``. Scored by pole log loss / Brier."""
+    from databricks.sdk import WorkspaceClient
+
+    from f1_forecast.backtest.metrics import event_scores
+    from f1_forecast.backtest.race_backtest import (
+        CATALOG,
+        Ctx,
+        frequency_tables,
+        history,
+        quali_priors,
+    )
+    from f1_forecast.sim.blend import QUALI_COLS, blend_many
+
+    w = WorkspaceClient()
+    ctx = Ctx(w, next(iter(w.warehouses.list())).id)
+    hist = history(ctx, season)
+    freq = frequency_tables(hist, season)
+    pred = ctx.q(f"""
+        SELECT round, driver_id, p_pole, p_top3_grid, p_top10, expected_grid
+        FROM {CATALOG}.gold.predictions
+        WHERE model_version = '{model_version}' AND season = {season}
+          AND stage = 'pre_weekend'""")
+    for c in ("round", *QUALI_COLS, "expected_grid"):
+        pred[c] = pd.to_numeric(pred[c])
+    q = hist[(hist["season"] == season) & (hist["session_code"] == "R")]
+    rows = []
+    for rnd, p in pred.groupby("round"):
+        p = p.reset_index(drop=True)
+        actual = q[q["round"] == rnd].set_index("driver_id")["quali_position"]
+        r = actual.reindex(p["driver_id"]).to_numpy()
+        if np.isfinite(r).sum() < 10:
+            continue
+        r = pd.Series(r).fillna(99).rank(method="first").to_numpy()
+        priors = quali_priors(hist, freq, season, int(rnd), p["driver_id"].tolist())
+        for wq, wc in itertools.product(GRID_W[:13], GRID_W[:13]):
+            if wq + wc > 0.9:
+                continue
+            b = blend_many(p, priors, {"previous_quali": wq, "championship": wc}, QUALI_COLS)
+            s = event_scores(b.assign(actual_rank=r), kind="quali")
+            rows.append({"w_previous_quali": wq, "w_championship": wc, **s})
+    df = pd.DataFrame(rows)
+    keys = ["w_previous_quali", "w_championship"]
+    out = df.groupby(keys)[["log_loss_pole", "brier_pole", "pole_hit", "top3_hits"]].mean()
+    return out.sort_values("log_loss_pole").reset_index()
+
+
 def run(season: int, sims: int, cache: Path, *, mode_blend: bool = False) -> pd.DataFrame:
     from databricks.sdk import WorkspaceClient
 
@@ -184,9 +236,15 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--sims", type=int, default=2000)
     p.add_argument("--cache", type=Path, default=Path(".cache/tune"))
     p.add_argument("--blend", action="store_true", help="learn the grid-prior blend weights")
+    p.add_argument(
+        "--quali", metavar="MODEL_VERSION", help="learn the pole blend from stored predictions"
+    )
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    out = run(args.season, args.sims, args.cache, mode_blend=args.blend)
+    if args.quali:
+        out = run_quali(args.season, args.quali).head(15)
+    else:
+        out = run(args.season, args.sims, args.cache, mode_blend=args.blend)
     with pd.option_context("display.max_rows", 200):
         print(out.round(3).to_string())
 

@@ -54,7 +54,7 @@ TRAIT_PRIORS = {
 TRAIT_DRIFT = {"quali_pace": 0.13, "race_pace": 0.13, "wet_skill": 0.1, "starts": 0.2}
 TEAM_FORM_SD = 0.45  # % lap time: event-to-event team pace variation (measured 0.3-0.6)
 EWMA_HALF_LIFE = 5.0  # races
-FIELD_MODEL_VERSION = "field_rw_v1"
+FIELD_MODEL_VERSION = "field_rw_v2"
 
 
 @dataclass

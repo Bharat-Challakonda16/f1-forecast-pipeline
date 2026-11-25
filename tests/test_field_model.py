@@ -69,6 +69,16 @@ def test_prepare_indexes_every_effect():
     assert data.meta["n_driver_tracks"] == 8 * 5
 
 
+def test_career_year_uses_debut_when_known():
+    df, _ = synthetic()
+    df["debut"] = np.where(df["driver_id"] == "ace", 2010, np.nan)  # veteran; others debut 2020
+    k = prepare(df).skill_keys.set_index(["driver_id", "season"])
+    assert k.loc[("ace", 2021), "exp_i"] == 0  # 12th season: general walk
+    assert k.loc[("b1", 2021), "exp_i"] == 1  # into the 2nd season
+    assert k.loc[("b1", 2022), "exp_i"] == 2  # into the 3rd
+    assert k.loc[("b1", 2023), "exp_i"] == 0
+
+
 def test_unknown_track_type_has_no_type_effect():
     df, _ = synthetic()
     df.loc[df["circuit_id"] == "bahrain", "speed_profile"] = None
