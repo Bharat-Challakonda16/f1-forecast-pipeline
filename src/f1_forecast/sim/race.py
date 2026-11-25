@@ -105,8 +105,14 @@ def simulate_race(
     pass_k: float | None = None,
     pass_threshold_s: float = PASS_THRESHOLD_S,
     dirty_air_pct: float = DIRTY_AIR_PCT,
+    car_z: np.ndarray | None = None,
+    skill_z: np.ndarray | None = None,
+    sprint: bool = False,
 ) -> RaceResult:
-    """``grid``: (sims, drivers) starting positions, e.g. ``QualiResult.grid``."""
+    """``grid``: (sims, drivers) starting positions, e.g. ``QualiResult.grid``.
+
+    ``car_z`` / ``skill_z``: optional shared standard-normal draws for estimate uncertainty
+    (see :func:`simulate_qualifying`). ``sprint``: short race, no compulsory stop."""
     rng = np.random.default_rng(seed)
     sims, n = grid.shape
     laps = int(circuit["laps"])
@@ -119,13 +125,13 @@ def simulate_race(
 
     # ------------------------------------------------------------------ per-race draws
     adj = track_type_adjustment(t, circuit.get("speed_profile")).to_numpy()
-    car = rng.normal(
-        t["car_race"].to_numpy(float), t["car_race_se"].to_numpy(float), (sims, len(t))
-    )
+    if car_z is None:
+        car_z = rng.standard_normal((sims, len(t)))
+    if skill_z is None:
+        skill_z = rng.standard_normal((sims, n))
+    car = t["car_race"].to_numpy(float) + t["car_race_se"].to_numpy(float) * car_z
     form = rng.normal(0.0, t["form_sd"].to_numpy(float), (sims, len(t)))
-    skill = rng.normal(
-        drivers["race_pace"].to_numpy(float), drivers["race_pace_se"].to_numpy(float), (sims, n)
-    )
+    skill = drivers["race_pace"].to_numpy(float) + drivers["race_pace_se"].to_numpy(float) * skill_z
     pace = (car + form + adj)[:, k] + skill  # % lap, lower = faster
     noise_sd = LAP_NOISE_PCT * np.exp(drivers["consistency"].fillna(0).to_numpy(float) / 100)
     driver_wear = drivers["tyre_wear"].fillna(0).to_numpy(float) / 10  # % per lap of age
@@ -137,11 +143,12 @@ def simulate_race(
         base_lap_ms=base_ms,
         pit_loss_s=circuit["pit_loss_s"],
         track_temp_c=circuit.get("track_temp_c") or 35.0,
+        sprint=sprint,
     )
     probs = plan_probabilities(plans)
     choice = rng.choice(len(plans), size=(sims, n), p=probs)
     max_stops = max(p.stops for p in plans)
-    pit_lap = np.full((sims, n, max_stops), laps + 99)
+    pit_lap = np.full((sims, n, max(max_stops, 1)), laps + 99)  # keep a slot even if no stops
     seq = np.zeros((sims, n, max_stops + 1), int)
     for i, p in enumerate(plans):
         m = choice == i

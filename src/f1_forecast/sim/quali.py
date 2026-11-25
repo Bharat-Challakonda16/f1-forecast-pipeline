@@ -67,9 +67,15 @@ def simulate_qualifying(
     sims: int = 10_000,
     seed: int = 2027,
     execution_sd: float = EXECUTION_SD,
+    car_z: np.ndarray | None = None,
+    skill_z: np.ndarray | None = None,
 ) -> QualiResult:
     """``drivers``: driver_id, constructor_id, quali_pace, quali_pace_se.
-    ``teams``: constructor_id, car_quali, car_quali_se, form_sd (+ optional track idx)."""
+    ``teams``: constructor_id, car_quali, car_quali_se, form_sd (+ optional track idx).
+
+    ``car_z`` (sims, teams) and ``skill_z`` (sims, drivers) are optional standard-normal draws
+    for the *estimate* uncertainty, so a season simulation can keep "the car is faster than
+    we think" consistent across all its events (weekend form stays independent)."""
     rng = np.random.default_rng(seed)
     t = teams.reset_index(drop=True)
     team_idx = {c: i for i, c in enumerate(t["constructor_id"])}
@@ -79,14 +85,14 @@ def simulate_qualifying(
     k = k.astype(int)
 
     adj = track_type_adjustment(t, speed_profile).to_numpy()
-    car = rng.normal(
-        t["car_quali"].to_numpy(float), t["car_quali_se"].to_numpy(float), (sims, len(t))
-    )
+    if car_z is None:
+        car_z = rng.standard_normal((sims, len(t)))
+    if skill_z is None:
+        skill_z = rng.standard_normal((sims, len(drivers)))
+    car = t["car_quali"].to_numpy(float) + t["car_quali_se"].to_numpy(float) * car_z
     form = rng.normal(0.0, t["form_sd"].to_numpy(float), (sims, len(t)))
-    skill = rng.normal(
-        drivers["quali_pace"].to_numpy(float),
-        drivers["quali_pace_se"].to_numpy(float),
-        (sims, len(drivers)),
+    skill = (
+        drivers["quali_pace"].to_numpy(float) + drivers["quali_pace_se"].to_numpy(float) * skill_z
     )
     execution = rng.normal(0.0, execution_sd, (sims, len(drivers)))
     pace = (car + form + adj)[:, k] + skill + execution

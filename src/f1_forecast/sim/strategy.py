@@ -69,6 +69,7 @@ def candidate_plans(
     pit_loss_s: float,
     track_temp_c: float = 35.0,
     max_stops: int = 2,
+    sprint: bool = False,
 ) -> list[Plan]:
     t = tyres.set_index("compound").reindex(list(COMPOUNDS))
     offset = t["fresh_pace_vs_medium_pct"].fillna(0.0).to_numpy(float)
@@ -79,9 +80,11 @@ def candidate_plans(
     # teams run up to the observed longest stints, with some margin over the p90
     max_stint = (t["max_stint_laps"].fillna(laps).to_numpy(float) * 1.15).clip(min=10)
     plans = []
-    for stops in range(1, max_stops + 1):
+    # Grand Prix: at least one stop and two compounds. Sprint: no stop needed.
+    min_stops, max_stops = (0, 1) if sprint else (1, max_stops)
+    for stops in range(min_stops, max_stops + 1):
         for seq in itertools.product(range(3), repeat=stops + 1):
-            if len(set(seq)) < 2:  # dry rule: at least two compounds
+            if not sprint and len(set(seq)) < 2:  # dry rule: at least two compounds
                 continue
             split = best_split(seq, laps, offset, wear, max_stint)
             if split is None:
