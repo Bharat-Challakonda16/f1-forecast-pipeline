@@ -1,4 +1,4 @@
-# Methodology: features (Phase 2)
+# Methodology: features and model inputs
 
 How every feature in the `gold` layer is measured, how it was validated, and what it can't do.
 Tables and row counts are in [data_dictionary.md](data_dictionary.md); the code is in
@@ -129,7 +129,7 @@ It is split into:
 | session | how the field ran that day | Normal(0, 0.5) |
 | **car[team, round]** | the car's pace *at that round* | random walk through each season, so upgrades show up as steps; the spread per round is learned (qualifying ≈0.17%, race ≈0.10%) |
 | car × track type | this car on high/medium/low/mixed-speed tracks, per season | Normal(0, learned σ) |
-| skill[driver, season] | the driver | career random walk |
+| skill[driver, season] | the driver | career random walk; the steps into the 2nd and 3rd season have their own learned spread and mean (young drivers develop fast: 0.22% vs 0.10% per year in qualifying) |
 | driver × track type | e.g. a driver who is strong on street-like slow tracks | Student-t(3), learned σ |
 | **driver × circuit** | e.g. Pérez in Baku, Alonso in Singapore | Student-t(3), learned σ |
 
@@ -156,7 +156,19 @@ Weekend form left over on top: 0.28% (qualifying) / 0.22% (race), from the share
 of teammates (0.34% / 0.28% before removing upgrades and track type).
 
 Stored per cutoff in `gold.field_effects` (one row per effect, `effect = hyper:<name>` rows
-hold the learned spreads). A fit takes ~30 s per kind.
+hold the learned spreads, `effect = debut` the first season). Version `field_rw_v2`; a fit
+takes ~40 s per kind. A per-round driver-form walk within a season was also tried: it
+learned ~0.01% per round and was removed.
+
+## From simulation to final probabilities
+
+The simulator makes races more open than they are. The pole sitter has won 55% of races
+since 2014, and the simulation gives less. So final race probabilities blend the
+simulation with how often each grid slot produced the outcome in the four previous seasons
+(`sim/blend.py`). After qualifying the weight of the grid history is 0.85. Before the
+weekend it is 0, because there it didn't help. Pole probabilities blend the model with last
+qualifying order (0.40) and championship order (0.25). All weights were learned on 2025
+and tested on 2026. Results are in [backtest_report.md](backtest_report.md).
 
 ## Tyre models (2019+)
 

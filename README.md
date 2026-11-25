@@ -38,12 +38,28 @@ Pipelines are incremental and idempotent: downloads never repeat (landed files a
 
 **Current data (Phase 1):** 2001 → latest race results, qualifying and ~880k laps; 2018+ telemetry and car positions (~880M rows, FastF1 + OpenF1); hourly weather per circuit since 2001. See [docs/data_dictionary.md](docs/data_dictionary.md) for every table, key and row count, and [docs/methodology.md](docs/methodology.md) for how each feature is measured and validated.
 
+**How good is it? (Phase 3 backtest, 2026 season, settings tuned on 2025 only)**
+
+| Before the weekend | Model | Best simple rule |
+|---|---|---|
+| Winner log loss (lower is better) | **1.65** | 1.87 (championship order) |
+| Podium finishers picked | **54%** | 52% (previous race) |
+
+| After qualifying | Model | Grid order |
+|---|---|---|
+| Winner log loss | **1.10** | 1.27 |
+| Winner picked | 71% | 71% |
+
+Probabilities are well calibrated. The weak spot is the model's single favourite before
+the weekend: it won 5 of 21 races, against 7 for the championship leader. See
+[docs/backtest_report.md](docs/backtest_report.md).
+
 ## Phase checklist
 
 - [x] **0. Setup:** repo, tooling, CI, Databricks catalog/schemas, hello Delta job
 - [x] **1. Data pipeline:** Jolpica (2001+), OpenF1 (2023+), FastF1 (2018–22), Open-Meteo history, 2027 calendar, circuit facts; bronze → silver; 33 DQ checks; idempotency proven
 - [x] **2. Features:** Bayesian driver traits (7, since 2001), car profiles incl. telemetry corner speeds, tyre models, safety-car / incident rates, pace trends; 36 known-fact and quality checks
-- [ ] **3. Simulator:** qualifying model, vectorized race sim, season aggregator, 2026 backtest
+- [x] **3. Simulator:** qualifying model, vectorised lap-by-lap race sim (strategies, safety cars, overtaking calibrated per circuit), season and championship odds, joint car / driver / track model, leak-free backtests tuned on 2025 and tested on 2026
 - [ ] **4. MVP launch:** Streamlit app
 - [ ] **5. Weather pipeline:** staged weather, track-temp calibration, daily refresh, prediction versioning
 - [ ] **6. Constructors + news:** development carry-over, LLM news signals, news backtest
@@ -56,13 +72,15 @@ Pipelines are incremental and idempotent: downloads never repeat (landed files a
 ```
 configs/                 sources.yaml (endpoints, limits), calendar_2027.csv, circuits_seed.csv
 src/f1_forecast/ingest/  downloaders: jolpica, openf1, fastf1_ingest, openmeteo (+ shared http client)
-src/f1_forecast/features/ Bayesian trait models (PyMC), corner detection, fit runners
+src/f1_forecast/features/ Bayesian trait models + joint field model (PyMC), corner detection, fit runners
+src/f1_forecast/sim/     event inputs, qualifying, race engine, strategies, season odds, blend
+src/f1_forecast/backtest/ season backtest, metrics, tuning
 src/f1_forecast/ops/     run_job (trigger Databricks jobs), run_sql (run layered SQL locally)
 databricks/notebooks/    bronze loaders (10-12), silver build + quality (20-21)
 databricks/sql/          silver/*.sql, gold/*.sql (rebuilt in order), quality/*_checks.sql
 databricks/resources/    Databricks jobs (Asset Bundle)
-.github/workflows/       ci, ingest_{jolpica,openf1,fastf1,openmeteo}, build_silver, fit_features
-docs/                    data_dictionary.md, methodology.md
+.github/workflows/       ci, ingest_{jolpica,openf1,fastf1,openmeteo}, build_silver, fit_features, backtest
+docs/                    data_dictionary.md, methodology.md, backtest_report.md
 tests/                   pytest suite
 ```
 

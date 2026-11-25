@@ -64,7 +64,7 @@ Row counts as of **2026-11-24** (data through the 2026 Las Vegas GP, round 21).
 - 2025 Baku qualifying laps come from FastF1 (OpenF1 has none).
 - OpenF1 feeds occasionally include non-F1 cars (2023 Hungary FP1); they are excluded in silver.
 
-## Gold (Phase 2 features)
+## Gold (features)
 
 | Table | Grain | What it holds |
 |---|---|---|
@@ -80,6 +80,17 @@ Row counts as of **2026-11-24** (data through the 2026 Las Vegas GP, round 21).
 | `car_profiles` | team x season x round | pace, track-type strengths, speed trap, tyre wear, reliability, pit stops (season-to-date) |
 | `quali_best_lap_telemetry`, `corner_speeds`, `car_corner_profiles` | lap samples / session x team / team x round | telemetry corner speeds by class |
 | `tyre_stints`, `tyre_temp_sensitivity`, `tyre_models` | stint / compound / circuit x compound | wear, temperature effect, fresh-tyre pace, stint lengths |
+| `driver_session_pace` | kind (quali / race), season, round, driver | pace vs the session median (best qualifying lap / median clean race lap), wet and outlier flags; input of the field model |
+
+## Gold (Phase 3 model outputs and backtests)
+
+| Table | Grain | What it holds |
+|---|---|---|
+| `field_effects` | kind, model_version, data_cutoff, effect, keys | joint field model per cutoff: car per team per round, car x track type, driver skill per season, driver x track type, driver x circuit, debut season, learned spreads (`hyper:*`) |
+| `predictions` | snapshot (stage, season, round, cutoff, model_version), driver | pole / grid and win / podium / points / DNF probabilities, expected position and points |
+| `backtest_events` | model_version, season, round, stage, method, metric | score of every race for the model and each baseline |
+| `backtest_results` | model_version, season, stage, method, metric | season averages of the above |
+| `backtest_calibration` | model_version, season, stage, prediction, probability bin | mean predicted vs observed frequency |
 
 ## Bronze
 
