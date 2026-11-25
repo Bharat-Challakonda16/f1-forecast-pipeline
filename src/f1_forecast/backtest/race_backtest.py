@@ -37,6 +37,7 @@ from f1_forecast.features.run_field import MODEL_VERSION as FIELD_VERSION
 from f1_forecast.features.run_field import run as fit_field
 from f1_forecast.features.run_traits import CATALOG, OUTPUT_VOLUME, TRAITS, execute, query_df
 from f1_forecast.features.run_traits import run as fit_trait
+from f1_forecast.sim.blend import GRID_BLEND, blend, grid_prior
 from f1_forecast.sim.inputs import load_event_inputs
 from f1_forecast.sim.quali import observed_team_surprise, simulate_qualifying
 from f1_forecast.sim.race import calibrate_pass_k, simulate_race
@@ -46,7 +47,8 @@ log = logging.getLogger(__name__)
 # race pace, race-wide strategy consensus and undercut cover.
 # sim_v3: + joint field model (car per round incl. upgrades, driver x track bonuses).
 # sim_v4: + lap-1 spread growing down the grid, retirement rates scaled to the field level.
-MODEL_VERSION = "sim_v4"
+# sim_v5: + race-pace spread x0.7, blended with grid-slot frequencies (both tuned on 2025).
+MODEL_VERSION = "sim_v5"
 
 
 @dataclass
@@ -192,7 +194,10 @@ def predict_round(
     sims: int,
     actual: pd.DataFrame,
     use_field: bool = True,
+    grid_table: pd.DataFrame | None = None,
 ):
+    """``grid_table``: frequencies by grid slot from earlier seasons; if given, the race
+    probabilities are blended with them (``sim/blend.py``)."""
     ev = load_event_inputs(season, rnd, as_of, use_field=use_field)
     # Score only drivers who actually raced (the entry list is known before a weekend).
     ev.drivers = ev.drivers[ev.drivers["driver_id"].isin(actual["driver_id"])].reset_index(
@@ -254,10 +259,14 @@ def predict_round(
     )
     qs = q.summary().drop(columns="grid_distribution").rename(columns={"p_top3": "p_top3_grid"})
     rows = []
-    for stage, res in (("pre_weekend", pre), ("post_quali", post)):
-        s = res.summary().merge(
-            qs if stage == "pre_weekend" else qs[["driver_id"]], on="driver_id", how="left"
-        )
+    for stage, res, g in (("pre_weekend", pre, q.grid), ("post_quali", post, grid_actual)):
+        s = res.summary()
+        if grid_table is not None:
+            prior = grid_prior(g, grid_table)
+            prior["driver_id"] = res.driver_ids
+            prior = prior.set_index("driver_id").reindex(s["driver_id"]).reset_index()
+            s = blend(s, prior, GRID_BLEND[stage])
+        s = s.merge(qs if stage == "pre_weekend" else qs[["driver_id"]], on="driver_id", how="left")
         s["stage"] = stage
         rows.append(s)
     pred = pd.concat(rows, ignore_index=True)
@@ -323,7 +332,9 @@ def run(
             (hist["season"] == season) & (hist["round"] == rnd) & (hist["session_code"] == "R")
         ]
         actual = races[["driver_id", "grid", "position", "quali_position", "quali_best_ms"]].copy()
-        pred, ev = predict_round(ctx, season, rnd, as_of, sims, actual, use_field)
+        pred, ev = predict_round(
+            ctx, season, rnd, as_of, sims, actual, use_field, grid_table=freq["grid"]
+        )
         pred["snapshot_id"] = pred["stage"] + f":{season}_{rnd:02d}:{as_of}:{model_version}"
         pred["model_version"], pred["created_at"] = model_version, created
         all_preds.append(pred)

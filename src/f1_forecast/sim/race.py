@@ -67,6 +67,10 @@ COVER_LAPS = 8
 # (dry races 2014-2026: 0.25, 2022-2026: 0.34; regression on recent race form + the
 # qualifying surprise).
 QUALI_TO_RACE = 0.30
+# Multiplier on race-pace uncertainty (car estimate, weekend form, driver). Tuned on the 2025
+# season (backtest/tune.py): 0.7 with QUALI_TO_RACE 0.3 gave the lowest winner log loss from
+# the actual grid; the full estimated spread made races too open.
+RACE_PACE_SCALE = 0.7
 
 
 def strategy_choices(
@@ -149,6 +153,8 @@ def simulate_race(
     strategy_follow: float = STRATEGY_FOLLOW,
     cover: bool = True,
     quali_surprise: np.ndarray | None = None,
+    quali_to_race: float = QUALI_TO_RACE,
+    pace_scale: float = RACE_PACE_SCALE,
 ) -> RaceResult:
     """``grid``: (sims, drivers) starting positions, e.g. ``QualiResult.grid``.
 
@@ -172,12 +178,16 @@ def simulate_race(
         car_z = rng.standard_normal((sims, len(t)))
     if skill_z is None:
         skill_z = rng.standard_normal((sims, n))
-    car = t["car_race"].to_numpy(float) + t["car_race_se"].to_numpy(float) * car_z
+    ps = pace_scale
+    car = t["car_race"].to_numpy(float) + ps * t["car_race_se"].to_numpy(float) * car_z
     form_sd = t["form_sd_race"] if "form_sd_race" in t else t["form_sd"]
-    form = rng.normal(0.0, form_sd.to_numpy(float), (sims, len(t)))
+    form = rng.normal(0.0, ps * form_sd.to_numpy(float), (sims, len(t)))
     if quali_surprise is not None:
-        form = form + QUALI_TO_RACE * np.broadcast_to(quali_surprise, (sims, len(t)))
-    skill = drivers["race_pace"].to_numpy(float) + drivers["race_pace_se"].to_numpy(float) * skill_z
+        form = form + quali_to_race * np.broadcast_to(quali_surprise, (sims, len(t)))
+    skill = (
+        drivers["race_pace"].to_numpy(float)
+        + ps * drivers["race_pace_se"].to_numpy(float) * skill_z
+    )
     pace = (car + form + adj)[:, k] + skill  # % lap, lower = faster
     noise_sd = LAP_NOISE_PCT * np.exp(drivers["consistency"].fillna(0).to_numpy(float) / 100)
     driver_wear = drivers["tyre_wear"].fillna(0).to_numpy(float) / 10  # % per lap of age
