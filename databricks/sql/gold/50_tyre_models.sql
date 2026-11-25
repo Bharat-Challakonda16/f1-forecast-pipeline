@@ -51,7 +51,7 @@ WHERE track_temp_c IS NOT NULL AND wear_pct_per_lap BETWEEN -0.5 AND 1.0
 GROUP BY compound;
 
 CREATE OR REPLACE TABLE ${catalog}.gold.tyre_models
-COMMENT 'Per circuit and compound: wear at a 35 C track (% and ms per lap), temperature sensitivity, fresh-tyre pace vs Medium, typical and longest (p90 ~ cliff) stint lengths. Circuit values are blended with the track-type average using 10 pseudo-stints; recent seasons weigh more (x0.85 per year).'
+COMMENT 'Per circuit and compound: modelled wear at a 35 C track = circuit wear level (all compounds pooled, recency-weighted, shrunk to the track-type level) x global compound wear (pooled over all stints) - keeps Soft > Medium > Hard; raw per-compound measurement kept for reference. Also temperature sensitivity, fresh-tyre pace vs Medium (teammates on the same lap), typical and p90 (~cliff) stint lengths.'
 AS
 WITH s AS (
   SELECT
@@ -77,6 +77,23 @@ by_circuit AS (
 by_type AS (
   SELECT speed_profile, compound, sum(wt * wear_at_35c) / sum(wt) AS wear_type
   FROM s GROUP BY ALL
+),
+compound_level AS (
+  -- Global wear per compound, pooled over every stint (robust ordering Soft > Medium > Hard)
+  SELECT compound, sum(wt * wear_at_35c) / sum(wt) AS compound_wear FROM s GROUP BY compound
+),
+circuit_level AS (
+  -- How hard a circuit is on tyres, as a multiple of the global compound wear, all compounds
+  -- pooled; shrunk to the track type's level with 15 pseudo-stints.
+  SELECT x.circuit_id,
+    (sum(x.wt * x.wear_at_35c / c.compound_wear) + 15 * max(t.type_level)) / (sum(x.wt) + 15) AS level
+  FROM s x
+  JOIN compound_level c USING (compound)
+  JOIN (
+    SELECT y.speed_profile, sum(y.wt * y.wear_at_35c / c2.compound_wear) / sum(y.wt) AS type_level
+    FROM s y JOIN compound_level c2 USING (compound) GROUP BY y.speed_profile
+  ) t ON t.speed_profile <=> x.speed_profile
+  GROUP BY x.circuit_id
 ),
 -- Fresh-tyre pace between compounds: teammates on the SAME lap on different compounds
 -- (same car, fuel load and track state), adjusted for their different tyre ages with the
@@ -119,8 +136,10 @@ global_offsets AS (
 )
 SELECT
   b.circuit_id, b.speed_profile, b.compound, b.stints,
-  (b.w_stints * b.wear_circuit + 10 * t.wear_type) / (b.w_stints + 10) AS wear_pct_per_lap_35c,
-  (b.w_stints * b.wear_circuit + 10 * t.wear_type) / (b.w_stints + 10) / 100 * b.lap_ms AS wear_ms_per_lap_35c,
+  cl.level * cw.compound_wear AS wear_pct_per_lap_35c,
+  cl.level * cw.compound_wear / 100 * b.lap_ms AS wear_ms_per_lap_35c,
+  cl.level AS circuit_wear_level,
+  (b.w_stints * b.wear_circuit + 10 * t.wear_type) / (b.w_stints + 10) AS raw_wear_pct_per_lap_35c,
   b.wear_per_10c AS wear_pct_per_lap_per_10c,
   CASE WHEN b.compound = 'MEDIUM' THEN 0.0
        ELSE (coalesce(o.races_compared, 0) * coalesce(o.fresh_vs_medium_pct, 0) + 5 * g.g_offset)
@@ -128,5 +147,7 @@ SELECT
   b.typical_stint_laps, b.max_stint_laps, b.lap_ms AS typical_lap_ms
 FROM by_circuit b
 JOIN by_type t USING (speed_profile, compound)
+JOIN circuit_level cl ON cl.circuit_id = b.circuit_id
+JOIN compound_level cw ON cw.compound = b.compound
 LEFT JOIN offsets o ON o.circuit_id = b.circuit_id AND o.compound = b.compound
 LEFT JOIN global_offsets g ON g.compound = b.compound;

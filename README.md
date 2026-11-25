@@ -36,13 +36,13 @@
 
 Pipelines are incremental and idempotent: downloads never repeat (landed files are immutable), bronze loads exactly once (Auto Loader / `MERGE` on file path), and silver is rebuilt deterministically from bronze with 33 data quality checks that fail the build. Every prediction run will be stored with its input versions.
 
-**Current data (Phase 1):** 2001 → latest race results, qualifying and ~880k laps; 2018+ telemetry and car positions (~880M rows, FastF1 + OpenF1); hourly weather per circuit since 2001. See [docs/data_dictionary.md](docs/data_dictionary.md) for every table, key and row count.
+**Current data (Phase 1):** 2001 → latest race results, qualifying and ~880k laps; 2018+ telemetry and car positions (~880M rows, FastF1 + OpenF1); hourly weather per circuit since 2001. See [docs/data_dictionary.md](docs/data_dictionary.md) for every table, key and row count, and [docs/methodology.md](docs/methodology.md) for how each feature is measured and validated.
 
 ## Phase checklist
 
 - [x] **0. Setup:** repo, tooling, CI, Databricks catalog/schemas, hello Delta job
 - [x] **1. Data pipeline:** Jolpica (2001+), OpenF1 (2023+), FastF1 (2018–22), Open-Meteo history, 2027 calendar, circuit facts; bronze → silver; 33 DQ checks; idempotency proven
-- [ ] **2. Features:** driver traits, car profiles, tyre models, incident rates, pace trends
+- [x] **2. Features:** Bayesian driver traits (7, since 2001), car profiles incl. telemetry corner speeds, tyre models, safety-car / incident rates, pace trends; 36 known-fact and quality checks
 - [ ] **3. Simulator:** qualifying model, vectorized race sim, season aggregator, 2026 backtest
 - [ ] **4. MVP launch:** Streamlit app
 - [ ] **5. Weather pipeline:** staged weather, track-temp calibration, daily refresh, prediction versioning
@@ -56,12 +56,13 @@ Pipelines are incremental and idempotent: downloads never repeat (landed files a
 ```
 configs/                 sources.yaml (endpoints, limits), calendar_2027.csv, circuits_seed.csv
 src/f1_forecast/ingest/  downloaders: jolpica, openf1, fastf1_ingest, openmeteo (+ shared http client)
+src/f1_forecast/features/ Bayesian trait models (PyMC), corner detection, fit runners
 src/f1_forecast/ops/     run_job (trigger Databricks jobs), run_sql (run layered SQL locally)
 databricks/notebooks/    bronze loaders (10-12), silver build + quality (20-21)
-databricks/sql/          silver/*.sql (rebuilt in order), quality/silver_checks.sql
+databricks/sql/          silver/*.sql, gold/*.sql (rebuilt in order), quality/*_checks.sql
 databricks/resources/    Databricks jobs (Asset Bundle)
-.github/workflows/       ci, ingest_{jolpica,openf1,fastf1,openmeteo}, build_silver
-docs/                    data_dictionary.md
+.github/workflows/       ci, ingest_{jolpica,openf1,fastf1,openmeteo}, build_silver, fit_features
+docs/                    data_dictionary.md, methodology.md
 tests/                   pytest suite
 ```
 

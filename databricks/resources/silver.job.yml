@@ -1,5 +1,6 @@
-# Rebuilds silver from bronze, runs the data quality checks (fails loudly), then rebuilds
-# the gold model inputs (teammate gaps etc.) that the feature models read.
+# Rebuilds silver from bronze, runs the silver quality checks (fails loudly), rebuilds the
+# gold feature tables, runs the gold checks (keys, ranges and known-F1-fact checks), then
+# refreshes the review notebook.
 resources:
   jobs:
     silver_build:
@@ -22,7 +23,7 @@ resources:
               catalog: ${var.catalog}
               checks_file: ${workspace.file_path}/databricks/sql/quality/silver_checks.sql
 
-        - task_key: build_gold_inputs
+        - task_key: build_gold
           depends_on:
             - task_key: quality_checks
           notebook_task:
@@ -30,3 +31,20 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               sql_dir: ${workspace.file_path}/databricks/sql/gold
+
+        - task_key: gold_checks
+          depends_on:
+            - task_key: build_gold
+          notebook_task:
+            notebook_path: ../notebooks/21_silver_quality.py
+            base_parameters:
+              catalog: ${var.catalog}
+              checks_file: ${workspace.file_path}/databricks/sql/quality/gold_checks.sql
+
+        - task_key: gold_sanity_review
+          depends_on:
+            - task_key: gold_checks
+          notebook_task:
+            notebook_path: ../notebooks/30_gold_sanity.py
+            base_parameters:
+              catalog: ${var.catalog}

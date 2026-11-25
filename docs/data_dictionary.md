@@ -1,6 +1,6 @@
 # Data dictionary
 
-Unity Catalog: `f1_forecast` · schemas `bronze` → `silver` → `gold` (gold arrives in Phase 2).
+Unity Catalog: `f1_forecast` · schemas `bronze` → `silver` → `gold`. How gold features are measured: [methodology.md](methodology.md).
 Row counts as of **2026-11-24** (data through the 2026 Las Vegas GP, round 21).
 
 ## How data flows
@@ -63,6 +63,23 @@ Row counts as of **2026-11-24** (data through the 2026 Las Vegas GP, round 21).
 - 2018 Monza race: Ricciardo's tyre compounds missing (FastF1 tyre-data bug; lap times complete).
 - 2025 Baku qualifying laps come from FastF1 (OpenF1 has none).
 - OpenF1 feeds occasionally include non-F1 cars (2023 Hungary FP1); they are excluded in silver.
+
+## Gold (Phase 2 features)
+
+| Table | Grain | What it holds |
+|---|---|---|
+| `driver_traits` | trait, model_version, data_cutoff, driver, season | 7 Bayesian traits with std error and 90% interval: quali_pace, race_pace, consistency, tyre_wear, starts, error_rate, wet_skill |
+| `quali_teammate_gaps`, `race_teammate_gaps`, `consistency_teammate_gaps`, `tyre_wear_teammate_gaps`, `start_teammate_gaps`, `wet_teammate_gaps` | session, teammate pair | model inputs |
+| `race_laps` | session, driver, lap | every race lap with clean / exclusion reason |
+| `race_conditions` | race | wet flags (broad + confident), pole ratio, rain |
+| `retirement_causes`, `driver_season_errors` | race x driver / season x driver | retirement cause (Jolpica or inferred), error counts |
+| `race_neutralisations` | race | safety car / VSC / red flag / lap-1 incident (official or inferred) |
+| `track_event_rates` | circuit | event probabilities per race |
+| `circuit_measures` | circuit | pit-stop loss, passes per green lap, overtaking difficulty 1-5 |
+| `team_event_pace` | team x event | gap to fastest, 5-race trend |
+| `car_profiles` | team x season x round | pace, track-type strengths, speed trap, tyre wear, reliability, pit stops (season-to-date) |
+| `quali_best_lap_telemetry`, `corner_speeds`, `car_corner_profiles` | lap samples / session x team / team x round | telemetry corner speeds by class |
+| `tyre_stints`, `tyre_temp_sensitivity`, `tyre_models` | stint / compound / circuit x compound | wear, temperature effect, fresh-tyre pace, stint lengths |
 
 ## Bronze
 
