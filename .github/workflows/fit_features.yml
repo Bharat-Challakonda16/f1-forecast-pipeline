@@ -1,8 +1,9 @@
 name: Fit features
 
 # Fits the Bayesian driver-trait models on fresh data and stores a new version in
-# gold.driver_traits, then updates the telemetry corner-speed profiles (new sessions only). Weekly after race weekends (after Jolpica + silver), or on demand,
-# optionally with an earlier data cutoff for backtests.
+# gold.driver_traits, then updates the telemetry corner-speed profiles (new sessions
+# only). Weekly after race weekends (after Jolpica + silver), or on demand, optionally
+# with an earlier data cutoff for backtests.
 on:
   workflow_dispatch:
     inputs:
