@@ -45,6 +45,7 @@ jobs:
         run: |
           traits="${{ inputs.trait || 'all' }}"
           if [ "$traits" = "all" ]; then
+            # dict order: wet_skill is last because it uses the dry traits fitted just before
             traits=$(python -c "from f1_forecast.features.run_traits import TRAITS; print(' '.join(TRAITS))")
           fi
           as_of_arg=""

@@ -135,6 +135,38 @@ TRAITS: dict[str, Trait] = {
         fit=_rate_fit,
         fit_kwargs={"base_rate": 0.07},
     ),
+    "wet_skill": Trait(
+        name="wet_skill",
+        model_version="teammate_rw_studentt_v1",
+        description=(
+            "Extra time deficit in the wet beyond the dry gap to the teammate, % "
+            "(lower = better in the rain); fit after race_pace and quali_pace"
+        ),
+        # Residual = wet gap minus the dry gap the two drivers' dry traits predict (latest
+        # dry fit at or before the cutoff, so backtests stay free of look-ahead).
+        query="""
+            WITH dry AS (
+              SELECT trait, driver_id, as_of_season, value
+              FROM {catalog}.gold.driver_traits t
+              WHERE trait IN ('race_pace', 'quali_pace')
+                AND model_version = 'teammate_rw_studentt_v1'
+                AND data_cutoff = (
+                  SELECT max(data_cutoff) FROM {catalog}.gold.driver_traits x
+                  WHERE x.trait = t.trait AND x.data_cutoff <= DATE'{as_of}'
+                )
+            )
+            SELECT g.season, g.driver_a, g.driver_b, g.gap_pct - (a.value - b.value) AS gap_pct
+            FROM {catalog}.gold.wet_teammate_gaps g
+            JOIN {catalog}.silver.events e ON e.season = g.season AND e.round = g.round
+            JOIN dry a ON a.trait = g.dry_trait AND a.driver_id = g.driver_a
+                      AND a.as_of_season = g.season
+            JOIN dry b ON b.trait = g.dry_trait AND b.driver_id = g.driver_b
+                      AND b.as_of_season = g.season
+            WHERE abs(g.gap_pct) <= 8 AND e.race_date < DATE'{as_of}'
+        """,
+        fit=_teammate_fit,
+        fit_kwargs={"prior_scale": 1.0},
+    ),
 }
 
 

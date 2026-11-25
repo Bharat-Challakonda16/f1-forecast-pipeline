@@ -1,52 +1,6 @@
 -- Race conditions and clean-lap flags: the shared basis for race pace, consistency,
 -- tyre wear and (later) safety-car rates.
 
-CREATE OR REPLACE TABLE ${catalog}.gold.race_conditions
-COMMENT 'Per race: wet or dry, and how we know. 2018+ from wet-tyre use; 2001-2017 from hourly rain at the circuit during the first two hours (threshold calibrated in the wet-skill step)'
-AS
-WITH races AS (
-  SELECT s.session_id, s.season, s.round, e.circuit_id,
-         coalesce(s.start_utc, e.race_start_utc) AS start_utc
-  FROM ${catalog}.silver.sessions s
-  JOIN ${catalog}.silver.events e ON e.season = s.season AND e.round = s.round
-  WHERE s.session_code = 'R'
-),
-tyres AS (
-  -- Only real compound names count (FastF1 reports UNKNOWN for some races, e.g. Spa 2021).
-  SELECT session_id, avg(CAST(is_wet_tyre AS INT)) AS wet_tyre_share, count(*) AS laps_with_compound
-  FROM ${catalog}.silver.laps
-  WHERE session_code = 'R'
-    AND compound IN ('HYPERSOFT', 'ULTRASOFT', 'SUPERSOFT', 'SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET')
-  GROUP BY session_id
-),
-sensor AS (
-  SELECT session_id, avg(CAST(rainfall AS INT)) AS sensor_rain_share
-  FROM ${catalog}.silver.session_weather GROUP BY session_id
-),
-hourly AS (
-  SELECT r.session_id, sum(w.precipitation_mm) AS rain_mm_2h
-  FROM races r
-  JOIN ${catalog}.silver.weather_hourly w
-    ON w.circuit_id = r.circuit_id
-   AND w.time_utc BETWEEN date_trunc('HOUR', r.start_utc) AND r.start_utc + INTERVAL 2 HOURS
-  GROUP BY r.session_id
-)
-SELECT
-  r.session_id, r.season, r.round, r.circuit_id, r.start_utc,
-  t.wet_tyre_share, s.sensor_rain_share, h.rain_mm_2h,
-  CASE
-    WHEN t.laps_with_compound > 0 THEN t.wet_tyre_share >= 0.10
-    WHEN h.rain_mm_2h IS NOT NULL THEN h.rain_mm_2h >= 0.5
-  END AS is_wet,
-  CASE
-    WHEN t.laps_with_compound > 0 THEN 'wet_tyre_share'
-    WHEN h.rain_mm_2h IS NOT NULL THEN 'hourly_rain'
-  END AS wet_source
-FROM races r
-LEFT JOIN tyres t USING (session_id)
-LEFT JOIN sensor s USING (session_id)
-LEFT JOIN hourly h USING (session_id);
-
 CREATE OR REPLACE TABLE ${catalog}.gold.race_laps
 COMMENT 'Every race lap with neutralisation, pit, traffic and outlier flags; is_clean = usable for pace comparisons'
 CLUSTER BY (season, session_id)
@@ -173,3 +127,72 @@ SELECT
     ELSE true
   END AS is_clean
 FROM final;
+
+CREATE OR REPLACE TABLE ${catalog}.gold.race_conditions
+COMMENT 'Per race: wet or dry. 2018+ from wet-tyre use (>= 10% of laps). 2001-2017 from lap times vs pole and hourly rain, calibrated on 2018+: is_wet (broad, for excluding wet races) and is_wet_confident (strict, for wet skill)'
+AS
+WITH races AS (
+  SELECT s.session_id, s.season, s.round, e.circuit_id,
+         coalesce(s.start_utc, e.race_start_utc) AS start_utc
+  FROM ${catalog}.silver.sessions s
+  JOIN ${catalog}.silver.events e ON e.season = s.season AND e.round = s.round
+  WHERE s.session_code = 'R'
+),
+tyres AS (
+  -- Only real compound names count (FastF1 reports UNKNOWN for some races, e.g. Spa 2021).
+  SELECT session_id, avg(CAST(is_wet_tyre AS INT)) AS wet_tyre_share, count(*) AS laps_with_compound
+  FROM ${catalog}.silver.laps
+  WHERE session_code = 'R'
+    AND compound IN ('HYPERSOFT', 'ULTRASOFT', 'SUPERSOFT', 'SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET')
+  GROUP BY session_id
+),
+sensor AS (
+  SELECT session_id, avg(CAST(rainfall AS INT)) AS sensor_rain_share
+  FROM ${catalog}.silver.session_weather GROUP BY session_id
+),
+hourly AS (
+  SELECT r.session_id, sum(w.precipitation_mm) AS rain_mm_2h
+  FROM races r
+  JOIN ${catalog}.silver.weather_hourly w
+    ON w.circuit_id = r.circuit_id
+   AND w.time_utc BETWEEN date_trunc('HOUR', r.start_utc) AND r.start_utc + INTERVAL 2 HOURS
+  GROUP BY r.session_id
+),
+pole AS (
+  SELECT season, round, min(least(q1_ms, q2_ms, q3_ms)) AS pole_ms
+  FROM ${catalog}.silver.qualifying WHERE session_code = 'Q' GROUP BY season, round
+),
+pace AS (
+  -- Typical green-flag race lap, for the "much slower than pole" wet signal.
+  SELECT session_id, season, round, percentile(lap_time_ms, 0.5) AS race_median_ms
+  FROM ${catalog}.gold.race_laps
+  WHERE lap > 1 AND NOT is_neutralised AND NOT is_in_lap AND NOT is_out_lap
+  GROUP BY ALL
+)
+SELECT
+  r.session_id, r.season, r.round, r.circuit_id, r.start_utc,
+  t.wet_tyre_share, s.sensor_rain_share, h.rain_mm_2h,
+  pc.race_median_ms / po.pole_ms AS pole_ratio,
+  -- Broad flag (used to keep wet races OUT of dry-pace measures: missing one matters more).
+  -- 2001-2017 calibrated on 2018+ races: slow laps OR >= 0.8 mm rain, F1 0.55.
+  CASE
+    WHEN t.laps_with_compound > 0 THEN t.wet_tyre_share >= 0.10
+    WHEN pc.race_median_ms IS NOT NULL OR h.rain_mm_2h IS NOT NULL
+      THEN coalesce(pc.race_median_ms / po.pole_ms >= 1.14, false) OR coalesce(h.rain_mm_2h >= 0.8, false)
+  END AS is_wet,
+  -- Confident flag (used to measure wet-weather skill: a false wet race matters more).
+  -- 2001-2017: race laps >= 14% slower than pole: 6/6 correct, 0 false alarms on 2018+.
+  CASE
+    WHEN t.laps_with_compound > 0 THEN t.wet_tyre_share >= 0.10
+    ELSE coalesce(pc.race_median_ms / po.pole_ms >= 1.14, false)
+  END AS is_wet_confident,
+  CASE
+    WHEN t.laps_with_compound > 0 THEN 'wet_tyre_share'
+    WHEN pc.race_median_ms IS NOT NULL OR h.rain_mm_2h IS NOT NULL THEN 'lap_times_and_hourly_rain'
+  END AS wet_source
+FROM races r
+LEFT JOIN tyres t USING (session_id)
+LEFT JOIN sensor s USING (session_id)
+LEFT JOIN hourly h USING (session_id)
+LEFT JOIN pace pc USING (session_id)
+LEFT JOIN pole po ON po.season = r.season AND po.round = r.round;
