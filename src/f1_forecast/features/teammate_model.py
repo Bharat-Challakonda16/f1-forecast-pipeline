@@ -44,6 +44,36 @@ class TeammateData:
     meta: dict[str, Any] = field(default_factory=dict)
 
 
+def career_keys(driver_seasons: pd.DataFrame) -> pd.DataFrame:
+    """Order (driver_id, season[, ...]) rows by career and add random-walk bookkeeping.
+
+    Adds ``is_first`` (career start), ``year_gap`` (seasons since the previous modelled
+    season, 1 at career start) and ``start_idx`` (row of this driver's career start).
+    """
+    keys = driver_seasons.sort_values(["driver_id", "season"], kind="stable").reset_index(drop=True)
+    keys["is_first"] = keys["driver_id"].ne(keys["driver_id"].shift())
+    prev = keys.groupby("driver_id")["season"].shift()
+    keys["year_gap"] = (keys["season"] - prev).fillna(1).astype(int)
+    keys["start_idx"] = keys.index.to_series().where(keys["is_first"]).ffill().astype(int)
+    return keys
+
+
+def career_random_walk(keys: pd.DataFrame, sigma_driver, sigma_walk, name: str = "skill"):
+    """Inside a PyMC model: one value per row of ``keys`` that starts each career at
+    ``Normal(0, sigma_driver)`` and moves ``Normal(0, sigma_walk * sqrt(years apart))`` per
+    season (non-centred, built as one segmented cumulative sum)."""
+    import pymc as pm
+    import pytensor.tensor as pt
+
+    z = pm.Normal(f"z_{name}", 0, 1, shape=len(keys))
+    is_first = keys["is_first"].to_numpy()
+    year_gap = keys["year_gap"].to_numpy().astype(float)
+    step = pt.where(is_first, sigma_driver * z, sigma_walk * pt.sqrt(year_gap) * z)
+    csum = pt.cumsum(step)
+    offset = pt.concatenate([pt.zeros(1), csum])[keys["start_idx"].to_numpy()]
+    return pm.Deterministic(name, csum - offset)
+
+
 def prepare(
     gaps: pd.DataFrame,
     *,
@@ -62,16 +92,7 @@ def prepare(
             df[[b_col, season_col]].rename(columns={b_col: "driver_id", season_col: "season"}),
         ]
     )
-    n_obs = ds.value_counts().rename("n_obs")
-    keys = (
-        n_obs.reset_index()
-        .sort_values(["driver_id", "season"], kind="stable")
-        .reset_index(drop=True)
-    )
-    keys["is_first"] = keys["driver_id"].ne(keys["driver_id"].shift())
-    prev = keys.groupby("driver_id")["season"].shift()
-    keys["year_gap"] = (keys["season"] - prev).fillna(1).astype(int)
-    keys["start_idx"] = keys.index.to_series().where(keys["is_first"]).ffill().astype(int)
+    keys = career_keys(ds.value_counts().rename("n_obs").reset_index())
 
     pos = {
         (d, s): i for i, (d, s) in enumerate(zip(keys["driver_id"], keys["season"], strict=True))
@@ -94,7 +115,6 @@ def prepare(
 def build_model(data: TeammateData, *, prior_scale: float = 1.0):
     """PyMC model (see module docstring). ``prior_scale`` sets the % scale of driver spread."""
     import pymc as pm
-    import pytensor.tensor as pt
 
     coords = {"driver_season": np.arange(len(data.keys)), "obs": np.arange(len(data.gap))}
     with pm.Model(coords=coords) as model:
@@ -103,14 +123,7 @@ def build_model(data: TeammateData, *, prior_scale: float = 1.0):
         sigma_obs = pm.HalfNormal("sigma_obs", prior_scale)
         nu = pm.Gamma("nu", alpha=2, beta=0.1)
 
-        # Non-centred random walk along each career, as one segmented cumulative sum.
-        z = pm.Normal("z", 0, 1, dims="driver_season")
-        step = pt.where(
-            data.is_first, sigma_driver * z, sigma_walk * pt.sqrt(data.year_gap.astype(float)) * z
-        )
-        csum = pt.cumsum(step)
-        offset = pt.concatenate([pt.zeros(1), csum])[data.start_idx]
-        skill = pm.Deterministic("skill", csum - offset, dims="driver_season")
+        skill = career_random_walk(data.keys, sigma_driver, sigma_walk)
 
         mu = skill[data.idx_a] - skill[data.idx_b]
         pm.StudentT("gap", nu=nu, mu=mu, sigma=sigma_obs, observed=data.gap, dims="obs")

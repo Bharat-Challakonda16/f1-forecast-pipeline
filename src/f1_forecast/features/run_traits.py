@@ -47,6 +47,12 @@ def _teammate_fit(df: pd.DataFrame, **kw: Any):
     return fit(df, **kw)
 
 
+def _rate_fit(df: pd.DataFrame, **kw: Any):
+    from f1_forecast.features.rate_model import fit
+
+    return fit(df, **kw)
+
+
 TRAITS: dict[str, Trait] = {
     "quali_pace": Trait(
         name="quali_pace",
@@ -103,6 +109,31 @@ TRAITS: dict[str, Trait] = {
         """,
         fit=_teammate_fit,
         fit_kwargs={"prior_scale": 0.5},
+    ),
+    "starts": Trait(
+        name="starts",
+        model_version="teammate_rw_studentt_v1",
+        description="Places lost on lap 1 vs expectation for the grid slot (lower=better)",
+        query="""
+            SELECT g.season, g.driver_a, g.driver_b, g.gap_places AS gap_pct
+            FROM {catalog}.gold.start_teammate_gaps g
+            JOIN {catalog}.silver.events e ON e.season = g.season AND e.round = g.round
+            WHERE abs(g.gap_places) <= 12 AND e.race_date < DATE'{as_of}'
+        """,
+        fit=_teammate_fit,
+        fit_kwargs={"prior_scale": 1.5},
+    ),
+    "error_rate": Trait(
+        name="error_rate",
+        model_version="poisson_rw_season_v1",
+        description="Driver-error retirements (crash/collision/spin) per race start (lower=safer)",
+        query="""
+            SELECT driver_id, season, error_dnfs AS events, race_starts AS exposure
+            FROM {catalog}.gold.driver_season_errors
+            WHERE season <= year(DATE'{as_of}')
+        """,
+        fit=_rate_fit,
+        fit_kwargs={"base_rate": 0.07},
     ),
 }
 

@@ -66,7 +66,8 @@ def test_fit_recovers_known_driver_order():
     from f1_forecast.features.teammate_model import fit
 
     df, true = simulate()
-    est, diag = fit(df, draws=300, tune=300, chains=2)
+    # Same sampler budget as the real fits: shorter runs leave r-hat borderline on this data.
+    est, diag = fit(df, draws=500, tune=500, chains=4)
     last = est.sort_values("season").groupby("driver_id").tail(1).set_index("driver_id")
     corr = np.corrcoef([true[d] for d in last.index], last["value"])[0, 1]
     assert corr > 0.9
@@ -105,3 +106,25 @@ def test_to_gold_rows_shapes_output():
         "data_cutoff": date(2026, 11, 24),
         "fitted_at": datetime(2026, 11, 25),
     }
+
+
+@pytest.mark.slow
+def test_rate_model_separates_crash_prone_driver():
+    pytest.importorskip("pymc")
+    pytest.importorskip("nutpie")
+    from f1_forecast.features.rate_model import fit
+
+    rng = np.random.default_rng(3)
+    rows = []
+    # 50 races per season keeps the simulated counts informative (with ~20, random noise
+    # alone can make an "average" driver look as careful as the careful one).
+    for s in range(2015, 2023):
+        for d, rate in [("careful", 0.03), ("average", 0.07), ("wild", 0.18)]:
+            rows.append((d, s, rng.poisson(rate * 50), 50))
+    rows.append(("rookie", 2022, 0, 3))  # three races, no errors: stays near average
+    df = pd.DataFrame(rows, columns=["driver_id", "season", "events", "exposure"])
+    est, diag = fit(df, draws=500, tune=500, chains=4)
+    last = est[est.season == 2022].set_index("driver_id")["value"]
+    assert last["careful"] < last["average"] < last["wild"]
+    assert 0.02 < last["rookie"] < 0.15  # shrunk towards the field, not zero
+    assert diag["divergences"] == 0
