@@ -1,0 +1,65 @@
+name: Forecast
+
+# Forecasts the next race (every stage the data allows: before the weekend, after
+# practice, after qualifying) and the championship, then publishes the JSON for the app.
+#
+# Publishing: the `data` branch is rebuilt each run as today's `main` + `site_data/`, and
+# force-pushed. The Streamlit app deploys from `data`, so it always runs the latest code
+# with the latest forecast, and `main` stays free of bot commits.
+#
+# Daily after the silver/gold build (09:00 UTC), so race weekends get an after-practice
+# forecast on Saturday morning and an after-qualifying one on Sunday morning.
+on:
+  workflow_dispatch:
+    inputs:
+      today:
+        description: "Forecast as of YYYY-MM-DD (empty = today)"
+        default: ""
+      sims:
+        description: "Simulations per stage"
+        default: "10000"
+  schedule:
+    - cron: "30 10 * * *"
+
+concurrency:
+  group: forecast
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install ".[models]"
+
+      - name: Forecast
+        run: |
+          args="--out site_data --sims ${{ inputs.sims || '10000' }}"
+          if [ -n "${{ inputs.today }}" ]; then args="$args --today ${{ inputs.today }}"; fi
+          python -m f1_forecast.predict.live $args
+
+      - name: Publish to the data branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B data
+          git add -f site_data
+          git commit -m "Forecast $(jq -r .event site_data/meta.json), stage $(jq -r .latest_stage site_data/meta.json)"
+          git push -f origin data

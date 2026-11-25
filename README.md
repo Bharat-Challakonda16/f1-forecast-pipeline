@@ -69,6 +69,35 @@ it did better than the simple rules. See [docs/backtest_report.md](docs/backtest
 - [ ] **8. Polish + launch:** React front end, full docs, backtest report
 - [ ] **9. Run it:** automatic post-race refresh and live accuracy tracking
 
+## The app (Phase 4)
+
+A Streamlit app with four pages:
+
+- **Next race:** pole / win / podium / points chances for every driver, likely tyre
+  strategies, and how the forecast changed after practice and qualifying.
+- **Championship:** title odds and the likely range of final points.
+- **How accurate:** the backtest against simple rules.
+- **About:** the method and the data sources.
+
+The `Forecast` workflow runs daily at 10:30 UTC, after the 09:00 data build. It forecasts
+the next race at every stage the data allows, plus the championship. It saves the results
+to `gold.predictions` and publishes small JSON files (`site_data/`) on the **`data`
+branch**: today's `main` plus the files, force-pushed. The app deploys from that branch,
+so it never needs Databricks credentials.
+
+**Run it locally**
+
+```powershell
+pip install -e ".[app]"
+python -m f1_forecast.predict.live          # writes site_data/ (needs the Databricks config)
+streamlit run app/streamlit_app.py
+```
+
+**Deploy (one time):** on [share.streamlit.io](https://share.streamlit.io), create an app
+from this repository with branch `data`, main file `app/streamlit_app.py` and Python 3.12.
+The `data` branch exists after the first `Forecast` run. Streamlit Cloud redeploys on
+every push to that branch.
+
 ## Repo layout
 
 ```
@@ -77,11 +106,13 @@ src/f1_forecast/ingest/  downloaders: jolpica, openf1, fastf1_ingest, openmeteo 
 src/f1_forecast/features/ Bayesian trait models + joint field model (PyMC), corner detection, fit runners
 src/f1_forecast/sim/     event inputs, qualifying, race engine, strategies, season odds, blend
 src/f1_forecast/backtest/ season backtest, metrics, tuning
+src/f1_forecast/predict/ live forecasts for the next race + championship, JSON for the app
+app/                     Streamlit app (next race, championship, accuracy, about)
 src/f1_forecast/ops/     run_job (trigger Databricks jobs), run_sql (run layered SQL locally)
 databricks/notebooks/    bronze loaders (10-12), silver build + quality (20-21)
 databricks/sql/          silver/*.sql, gold/*.sql (rebuilt in order), quality/*_checks.sql
 databricks/resources/    Databricks jobs (Asset Bundle)
-.github/workflows/       ci, ingest_{jolpica,openf1,fastf1,openmeteo}, build_silver, fit_features, backtest
+.github/workflows/       ci, ingest_{jolpica,openf1,fastf1,openmeteo}, build_silver, fit_features, backtest, predict
 docs/                    data_dictionary.md, methodology.md, backtest_report.md
 tests/                   pytest suite
 ```

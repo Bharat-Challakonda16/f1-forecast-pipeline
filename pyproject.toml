@@ -32,6 +32,8 @@ dev = [
 fastf1 = ["fastf1>=3.9.2"]
 # Bayesian feature models (Phase 2): run on CI / locally for samples.
 models = ["pymc>=5.20", "nutpie>=0.16", "arviz>=0.20"]
+# Streamlit app (Phase 4); keep in sync with app/requirements.txt (used by Streamlit Cloud).
+app = ["streamlit==1.67.0"]
 # Added in Phase 1+ (kept out until needed so CI stays fast)
 # ingest = ["requests", "tenacity", "fastf1", "polars", "pyarrow"]
 
