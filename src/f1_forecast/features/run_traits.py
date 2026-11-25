@@ -19,7 +19,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -38,6 +38,7 @@ class Trait:
     query: str  # must return the columns the fit function expects; {catalog} {as_of} filled in
     fit: Callable[..., tuple[pd.DataFrame, dict[str, Any]]]
     description: str
+    fit_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 def _teammate_fit(df: pd.DataFrame, **kw: Any):
@@ -59,6 +60,49 @@ TRAITS: dict[str, Trait] = {
               AND e.race_date < DATE'{as_of}'
         """,
         fit=_teammate_fit,
+        fit_kwargs={"prior_scale": 1.0},
+    ),
+    "race_pace": Trait(
+        name="race_pace",
+        model_version="teammate_rw_studentt_v1",
+        description="Race-lap deficit vs an average driver on shared clean laps, % (lower=faster)",
+        query="""
+            SELECT g.season, g.driver_a, g.driver_b, g.gap_pct
+            FROM {catalog}.gold.race_teammate_gaps g
+            JOIN {catalog}.silver.events e ON e.season = g.season AND e.round = g.round
+            WHERE abs(g.gap_pct) <= 5 AND e.race_date < DATE'{as_of}'
+        """,
+        fit=_teammate_fit,
+        fit_kwargs={"prior_scale": 1.0},
+    ),
+    "consistency": Trait(
+        name="consistency",
+        model_version="teammate_rw_studentt_v1",
+        description="Lap-time spread vs an average driver, 100*log ratio (lower = more consistent)",
+        query="""
+            SELECT g.season, g.driver_a, g.driver_b, g.gap_pct
+            FROM {catalog}.gold.consistency_teammate_gaps g
+            JOIN {catalog}.silver.events e ON e.season = g.season AND e.round = g.round
+            WHERE e.race_date < DATE'{as_of}'
+        """,
+        fit=_teammate_fit,
+        fit_kwargs={"prior_scale": 25.0},
+    ),
+    "tyre_wear": Trait(
+        name="tyre_wear",
+        model_version="teammate_rw_studentt_v1",
+        description=(
+            "Tyre wear vs an average driver: extra % lap time per 10 laps of tyre age "
+            "(lower = gentler on tyres), 2018+"
+        ),
+        query="""
+            SELECT g.season, g.driver_a, g.driver_b, g.gap_pct
+            FROM {catalog}.gold.tyre_wear_teammate_gaps g
+            JOIN {catalog}.silver.events e ON e.season = g.season AND e.round = g.round
+            WHERE abs(g.gap_pct) <= 5 AND e.race_date < DATE'{as_of}'
+        """,
+        fit=_teammate_fit,
+        fit_kwargs={"prior_scale": 0.5},
     ),
 }
 
@@ -136,7 +180,7 @@ def run(trait_name: str, as_of: date, *, draws: int, tune: int, chains: int) -> 
     df = query_df(w, warehouse_id, trait.query.format(catalog=CATALOG, as_of=as_of.isoformat()))
     log.info("%s: %d observations up to %s", trait.name, len(df), as_of)
     t0 = time.monotonic()
-    est, diagnostics = trait.fit(df, draws=draws, tune=tune, chains=chains)
+    est, diagnostics = trait.fit(df, draws=draws, tune=tune, chains=chains, **trait.fit_kwargs)
     fitted_at = datetime.now(UTC).replace(tzinfo=None)
     rows = to_gold_rows(est, trait, as_of, fitted_at)
 

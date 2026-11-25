@@ -124,6 +124,7 @@ def fit(
     tune: int = 1000,
     chains: int = 4,
     seed: int = 2027,
+    prior_scale: float = 1.0,
     **prepare_kw: Any,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Fit the model; returns one row per (driver_id, season) plus sampler diagnostics."""
@@ -131,7 +132,7 @@ def fit(
     import pymc as pm
 
     data = prepare(gaps, **prepare_kw)
-    with build_model(data):
+    with build_model(data, prior_scale=prior_scale):
         idata = pm.sample(
             draws=draws,
             tune=tune,
@@ -155,5 +156,6 @@ def fit(
         "divergences": int(idata.sample_stats["diverging"].sum()),
         "draws": draws,
         "chains": chains,
+        "prior_scale": prior_scale,
     }
     return out, diagnostics
