@@ -159,11 +159,11 @@ SELECT
        / (power(p.w_races + 6, 2) * (p.w_races + 7))) AS sc_prob_sd
 FROM per p CROSS JOIN global g;
 
-CREATE OR REPLACE TABLE ${catalog}.gold.circuit_measures
-COMMENT 'Measured per circuit (2018+ races, recency-weighted): pit-stop time loss under green flag, on-track passes per green lap, and an overtaking difficulty score 1 (easy) - 5 (hardest) from those passes'
+CREATE OR REPLACE TABLE ${catalog}.gold.green_pit_stops
+COMMENT 'Every green-flag pit stop in a dry race (2018+) with its time loss: in-lap + out-lap minus two of the driver''s typical laps. Per-stop so circuit values can be built as of any date.'
 AS
-WITH stops AS (
-  -- Time lost by a stop = in-lap + out-lap minus two of the driver's typical laps.
+SELECT s.*, e.round, e.race_date
+FROM (-- Time lost by a stop = in-lap + out-lap minus two of the driver's typical laps.
   SELECT
     i.session_id, i.season, e.circuit_id,
     (i.lap_time_ms + o.lap_time_ms - 2 * i.driver_median_ms) / 1000.0 AS loss_s
@@ -173,16 +173,14 @@ WITH stops AS (
   JOIN ${catalog}.silver.events e ON e.season = i.season AND e.round = i.round
   JOIN ${catalog}.gold.race_conditions c ON c.session_id = i.session_id
   WHERE i.is_in_lap AND o.is_out_lap AND NOT i.is_neutralised AND NOT o.is_neutralised
-    AND i.season >= 2018 AND NOT coalesce(c.is_wet, false)
-),
-pit AS (
-  SELECT circuit_id, count(*) AS green_stops,
-         percentile(loss_s, 0.5) AS pit_loss_s
-  FROM stops
-  WHERE loss_s BETWEEN 5 AND 60
-  GROUP BY circuit_id
-),
-lap_moves AS (
+    AND i.season >= 2018 AND NOT coalesce(c.is_wet, false)) s
+JOIN ${catalog}.silver.events e ON e.season = s.season AND e.circuit_id = s.circuit_id
+  AND e.round = CAST(split(s.session_id, '_')[1] AS INT);
+
+CREATE OR REPLACE TABLE ${catalog}.gold.race_overtakes
+COMMENT 'Per dry race (2018+): on-track passes and green laps. Passes = places gained by cars not pitting, minus places handed over by cars that pitted or retired. Per-race so circuit values can be built as of any date.'
+AS
+WITH lap_moves AS (
   -- Position change of every car between consecutive laps (lap 2 onwards, green laps).
   SELECT
     cur.session_id, cur.season, cur.round, cur.lap,
@@ -219,19 +217,30 @@ per_lap AS (
   FROM lap_moves m
   LEFT JOIN retirements r ON r.session_id = m.session_id AND r.lap = m.lap
   GROUP BY m.session_id, m.season, m.round, m.lap
-),
-passes AS (
-  SELECT p.session_id, e.circuit_id, p.season,
+)
+SELECT x.*, e.round, e.race_date
+FROM (SELECT p.session_id, e.circuit_id, p.season,
          sum(p.passes) AS passes, count(*) AS green_laps
   FROM per_lap p
   JOIN ${catalog}.silver.events e ON e.season = p.season AND e.round = p.round
   JOIN ${catalog}.gold.race_conditions c ON c.session_id = p.session_id
   WHERE NOT coalesce(c.is_wet, false)
-  GROUP BY p.session_id, e.circuit_id, p.season
+  GROUP BY p.session_id, e.circuit_id, p.season) x
+JOIN ${catalog}.silver.events e ON e.season = x.season AND e.circuit_id = x.circuit_id
+  AND e.round = CAST(split(x.session_id, '_')[1] AS INT);
+
+CREATE OR REPLACE TABLE ${catalog}.gold.circuit_measures
+COMMENT 'Per circuit, all races to date: green-flag pit-stop loss (median), on-track passes per green lap, overtaking difficulty 1 (easy) - 5 (hardest). Built from gold.green_pit_stops / gold.race_overtakes; the simulator rebuilds the same values as of its cutoff.'
+AS
+WITH pit AS (
+  SELECT circuit_id, count(*) AS green_stops, percentile(loss_s, 0.5) AS pit_loss_s
+  FROM ${catalog}.gold.green_pit_stops
+  WHERE loss_s BETWEEN 5 AND 60
+  GROUP BY circuit_id
 ),
 ovt AS (
   SELECT circuit_id, count(*) AS races, sum(passes) / sum(green_laps) AS passes_per_green_lap
-  FROM passes GROUP BY circuit_id
+  FROM ${catalog}.gold.race_overtakes GROUP BY circuit_id
 )
 SELECT
   coalesce(p.circuit_id, o.circuit_id) AS circuit_id,

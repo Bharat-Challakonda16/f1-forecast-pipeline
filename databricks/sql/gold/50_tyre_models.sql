@@ -50,6 +50,36 @@ FROM ${catalog}.gold.tyre_stints
 WHERE track_temp_c IS NOT NULL AND wear_pct_per_lap BETWEEN -0.5 AND 1.0
 GROUP BY compound;
 
+CREATE OR REPLACE TABLE ${catalog}.gold.tyre_compound_offsets
+COMMENT 'Per dry race (2019+): fresh-tyre pace of SOFT / HARD vs MEDIUM from teammates on the same lap on different compounds (same car, fuel and track state), adjusted for tyre-age difference with the pooled compound wear. Per race so circuit values can be built as of any date.'
+AS
+WITH pair_laps AS (
+  SELECT
+    a.session_id, a.season, a.round, e.circuit_id, e.race_date,
+    a.compound AS ca, b.compound AS cb,
+    100 * ln(CAST(a.lap_time_ms AS DOUBLE) / b.lap_time_ms)
+      - (wa.mean_wear_pct_per_lap * a.tyre_life - wb.mean_wear_pct_per_lap * b.tyre_life) AS d
+  FROM ${catalog}.gold.race_laps a
+  JOIN ${catalog}.gold.race_laps b
+    ON b.session_id = a.session_id AND b.lap = a.lap AND b.constructor_id = a.constructor_id
+   AND b.driver_id <> a.driver_id AND b.compound <> a.compound
+  JOIN ${catalog}.gold.race_conditions rc ON rc.session_id = a.session_id
+  JOIN ${catalog}.silver.events e ON e.season = a.season AND e.round = a.round
+  JOIN ${catalog}.gold.tyre_temp_sensitivity wa ON wa.compound = a.compound
+  JOIN ${catalog}.gold.tyre_temp_sensitivity wb ON wb.compound = b.compound
+  WHERE a.is_clean AND b.is_clean AND a.season >= 2019 AND NOT coalesce(rc.is_wet, false)
+    AND a.compound IN ('SOFT', 'MEDIUM', 'HARD') AND b.compound IN ('SOFT', 'MEDIUM', 'HARD')
+    AND a.tyre_life IS NOT NULL AND b.tyre_life IS NOT NULL
+)
+SELECT session_id, season, round, circuit_id, race_date, compound,
+       percentile(d, 0.5) AS fresh_vs_medium_pct, count(*) AS lap_pairs
+FROM (
+  SELECT session_id, season, round, circuit_id, race_date, ca AS compound, d FROM pair_laps WHERE cb = 'MEDIUM'
+  UNION ALL
+  SELECT session_id, season, round, circuit_id, race_date, cb AS compound, -d FROM pair_laps WHERE ca = 'MEDIUM'
+)
+GROUP BY ALL;
+
 CREATE OR REPLACE TABLE ${catalog}.gold.tyre_models
 COMMENT 'Per circuit and compound: modelled wear at a 35 C track = circuit wear level (all compounds pooled, recency-weighted, shrunk to the track-type level) x global compound wear (pooled over all stints) - keeps Soft > Medium > Hard; raw per-compound measurement kept for reference. Also temperature sensitivity, fresh-tyre pace vs Medium (teammates on the same lap), typical and p90 (~cliff) stint lengths.'
 AS
@@ -95,44 +125,14 @@ circuit_level AS (
   ) t ON t.speed_profile <=> x.speed_profile
   GROUP BY x.circuit_id
 ),
--- Fresh-tyre pace between compounds: teammates on the SAME lap on different compounds
--- (same car, fuel load and track state), adjusted for their different tyre ages with the
--- circuit's wear rates. (Comparing stint intercepts instead is biased by track evolution:
--- hards usually run late, on a faster, rubbered-in track.)
-pair_laps AS (
-  SELECT
-    a.session_id, e.circuit_id, a.compound AS ca, b.compound AS cb,
-    100 * ln(CAST(a.lap_time_ms AS DOUBLE) / b.lap_time_ms)
-      - (wa.wear_circuit * a.tyre_life - wb.wear_circuit * b.tyre_life) AS d
-  FROM ${catalog}.gold.race_laps a
-  JOIN ${catalog}.gold.race_laps b
-    ON b.session_id = a.session_id AND b.lap = a.lap AND b.constructor_id = a.constructor_id
-   AND b.driver_id <> a.driver_id AND b.compound <> a.compound
-  JOIN ${catalog}.gold.race_conditions rc ON rc.session_id = a.session_id
-  JOIN ${catalog}.silver.events e ON e.season = a.season AND e.round = a.round
-  JOIN by_circuit wa ON wa.circuit_id = e.circuit_id AND wa.compound = a.compound
-  JOIN by_circuit wb ON wb.circuit_id = e.circuit_id AND wb.compound = b.compound
-  WHERE a.is_clean AND b.is_clean AND a.season >= 2019 AND NOT coalesce(rc.is_wet, false)
-    AND a.compound IN ('SOFT', 'MEDIUM', 'HARD') AND b.compound IN ('SOFT', 'MEDIUM', 'HARD')
-    AND a.tyre_life IS NOT NULL AND b.tyre_life IS NOT NULL
-),
-pairs AS (
-  -- per race: median gap of SOFT / HARD vs MEDIUM (both orders of the pair)
-  SELECT session_id, circuit_id, compound, percentile(d, 0.5) AS fresh_vs_medium_pct
-  FROM (
-    SELECT session_id, circuit_id, ca AS compound, d FROM pair_laps WHERE cb = 'MEDIUM'
-    UNION ALL
-    SELECT session_id, circuit_id, cb AS compound, -d FROM pair_laps WHERE ca = 'MEDIUM'
-  )
-  GROUP BY ALL
-),
 offsets AS (
   SELECT circuit_id, compound, count(*) AS races_compared,
          percentile(fresh_vs_medium_pct, 0.5) AS fresh_vs_medium_pct
-  FROM pairs GROUP BY ALL
+  FROM ${catalog}.gold.tyre_compound_offsets GROUP BY ALL
 ),
 global_offsets AS (
-  SELECT compound, percentile(fresh_vs_medium_pct, 0.5) AS g_offset FROM pairs GROUP BY compound
+  SELECT compound, percentile(fresh_vs_medium_pct, 0.5) AS g_offset
+  FROM ${catalog}.gold.tyre_compound_offsets GROUP BY compound
 )
 SELECT
   b.circuit_id, b.speed_profile, b.compound, b.stints,

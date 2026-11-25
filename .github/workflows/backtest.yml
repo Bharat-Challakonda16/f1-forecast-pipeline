@@ -1,0 +1,49 @@
+name: Backtest
+
+# Predicts every completed race of a season using only data from before it (driver traits
+# refitted per race cutoff, circuit parameters from earlier races only), stores the
+# predictions in gold.predictions and scores them against simple baselines into
+# gold.backtest_results / backtest_events / backtest_calibration.
+on:
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season to backtest"
+        default: "2026"
+      rounds:
+        description: "Only these rounds, space-separated (empty = all completed)"
+        default: ""
+      sims:
+        description: "Simulations per event"
+        default: "10000"
+
+concurrency:
+  group: backtest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install ".[models]"
+
+      - name: Backtest
+        run: |
+          args=(--season "${{ inputs.season }}" --sims "${{ inputs.sims }}")
+          if [ -n "${{ inputs.rounds }}" ]; then args+=(--rounds ${{ inputs.rounds }}); fi
+          python -m f1_forecast.backtest.race_backtest "${args[@]}"

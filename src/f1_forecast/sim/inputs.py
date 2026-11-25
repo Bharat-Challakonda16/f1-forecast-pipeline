@@ -23,6 +23,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from f1_forecast.sim.circuit_params import event_rates, overtaking, pit_loss, tyre_params
+
 CATALOG = "f1_forecast"
 TRAITS = [
     "quali_pace",
@@ -254,50 +256,69 @@ def load_event_inputs(season: int, rnd: int, as_of: date | None = None) -> Event
     teams["reliability_dnf_rate"] = teams["reliability_dnf_rate"].fillna(0.08)
     teams["form_sd"] = TEAM_FORM_SD
 
-    circ = _q(
+    # Circuit parameters from per-race tables, only races before the cutoff (no leakage).
+    before = f"e.race_date < DATE'{as_of}'"
+    ref_season = int(season)
+    neutral = _q(
         w,
         wh,
         f"""
-        SELECT r.sc_prob, r.vsc_prob, r.red_flag_prob, r.lap1_incident_prob,
-               m.pit_loss_s, m.passes_per_green_lap, m.overtaking_difficulty
-        FROM {cat}.gold.track_event_rates r
-        LEFT JOIN {cat}.gold.circuit_measures m USING (circuit_id)
-        WHERE r.circuit_id = '{cid}'""",
+        SELECT n.season, n.circuit_id, n.had_sc, n.had_vsc, n.had_red, n.had_lap1_incident
+        FROM {cat}.gold.race_neutralisations n
+        JOIN {cat}.silver.events e ON e.season = n.season AND e.round = n.round
+        WHERE {before}""",
     )
-    tyres = _q(
+    for col in ("had_sc", "had_vsc", "had_red", "had_lap1_incident"):
+        neutral[col] = neutral[col].map({"true": 1.0, "false": 0.0, True: 1.0, False: 0.0})
+    rates = event_rates(neutral, cid, ref_season)
+    overtakes = _q(
         w,
         wh,
         f"""
-        SELECT compound, wear_ms_per_lap_35c, wear_pct_per_lap_35c, wear_pct_per_lap_per_10c,
-               fresh_pace_vs_medium_pct, typical_stint_laps, max_stint_laps, typical_lap_ms
-        FROM {cat}.gold.tyre_models WHERE circuit_id = '{cid}'""",
+        SELECT circuit_id, passes, green_laps FROM {cat}.gold.race_overtakes e WHERE {before}""",
     )
-    if tyres.empty:  # circuit without 2019+ data: track-type average
-        tyres = _q(
-            w,
-            wh,
-            f"""
-            SELECT compound, avg(wear_ms_per_lap_35c) AS wear_ms_per_lap_35c,
-                   avg(wear_pct_per_lap_35c) AS wear_pct_per_lap_35c,
-                   avg(wear_pct_per_lap_per_10c) AS wear_pct_per_lap_per_10c,
-                   avg(fresh_pace_vs_medium_pct) AS fresh_pace_vs_medium_pct,
-                   avg(typical_stint_laps) AS typical_stint_laps,
-                   avg(max_stint_laps) AS max_stint_laps,
-                   avg(typical_lap_ms) AS typical_lap_ms
-            FROM {cat}.gold.tyre_models GROUP BY compound""",
-        )
-    for col in tyres.columns.drop("compound"):
-        tyres[col] = pd.to_numeric(tyres[col])
-    tyres = sane_compound_pace(
-        tyres,
-        _q(
-            w,
-            wh,
-            f"""
-        SELECT compound, percentile(fresh_pace_vs_medium_pct, 0.5) AS global_offset
-        FROM {cat}.gold.tyre_models GROUP BY compound""",
-        ),
+    overtakes[["passes", "green_laps"]] = overtakes[["passes", "green_laps"]].astype(float)
+    passes, difficulty = overtaking(overtakes, cid)
+    stops = _q(
+        w,
+        wh,
+        f"""
+        SELECT circuit_id, loss_s FROM {cat}.gold.green_pit_stops e
+        WHERE circuit_id = '{cid}' AND {before}""",
     )
+    stints = _q(
+        w,
+        wh,
+        f"""
+        SELECT t.season, t.circuit_id, t.speed_profile, t.compound, t.wear_pct_per_lap,
+               t.median_lap_ms, t.stint_laps, t.track_temp_c
+        FROM {cat}.gold.tyre_stints t
+        JOIN {cat}.silver.events e ON e.season = t.season AND e.round = t.round
+        WHERE {before}""",
+    )
+    for col in ("season", "wear_pct_per_lap", "median_lap_ms", "stint_laps", "track_temp_c"):
+        stints[col] = pd.to_numeric(stints[col])
+    offsets = _q(
+        w,
+        wh,
+        f"""
+        SELECT circuit_id, compound, fresh_vs_medium_pct
+        FROM {cat}.gold.tyre_compound_offsets e WHERE {before}""",
+    ).astype({"fresh_vs_medium_pct": float})
+    tyres = tyre_params(stints, offsets, cid, ev["speed_profile"], ref_season)
+    global_offsets = (
+        offsets.groupby("compound")["fresh_vs_medium_pct"]
+        .median()
+        .rename("global_offset")
+        .reset_index()
+    )
+    tyres = sane_compound_pace(tyres, global_offsets)
+    c = {
+        **rates,
+        "pit_loss_s": pit_loss(stops, cid),
+        "passes_per_green_lap": passes,
+        "overtaking_difficulty": difficulty,
+    }
     temp = _q(
         w,
         wh,
@@ -308,7 +329,6 @@ def load_event_inputs(season: int, rnd: int, as_of: date | None = None) -> Event
         WHERE e.circuit_id = '{cid}' AND s.session_code = 'R' AND e.race_date < DATE'{as_of}'""",
     )
 
-    c = circ.iloc[0].to_dict() if len(circ) else {}
     circuit = {
         "circuit_id": cid,
         "event_name": ev["event_name"],
