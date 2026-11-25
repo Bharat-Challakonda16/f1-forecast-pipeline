@@ -117,3 +117,25 @@ def test_replays_record_positions_every_lap():
     r = simulate_race(d, t, TYRES, circuit(), grid_in_order(10, 6), n_replays=2)
     assert len(r.replays) == 2 and len(r.replays[0]["positions"]) == 49
     assert sorted(r.replays[0]["positions"][-1]) == list(range(6))
+
+
+def test_calibration_hits_the_measured_overtaking_rate():
+    from f1_forecast.sim.race import calibrate_pass_k
+
+    d, t = field(n=8, pace_gap=0.15, form=0.2)
+    g = np.tile(np.random.default_rng(0).permutation(8) + 1, (600, 1))
+    for target in (0.10, 0.40):
+        c = calibrate_pass_k(d, t, TYRES, circuit(), g, target=target, sims=600)
+        assert abs(c.achieved - target) / target < 0.15
+        assert c.slipstream == 0.0  # reachable without a tow
+        r = simulate_race(d, t, TYRES, circuit(), g, seed=5, n_replays=0, **c.race_kwargs())
+        assert abs(r.passes_per_green_lap - target) / target < 0.25  # holds on a new seed
+
+
+def test_unreachable_rate_switches_on_the_slipstream():
+    from f1_forecast.sim.race import calibrate_pass_k
+
+    d, t = field(n=8, pace_gap=0.05)
+    g = np.tile(np.arange(1, 9), (400, 1))
+    c = calibrate_pass_k(d, t, TYRES, circuit(), g, target=3.0, sims=400, iterations=6)
+    assert c.slipstream > 0 and c.threshold_s < 0.2 and c.dirty_air_pct < 0.25

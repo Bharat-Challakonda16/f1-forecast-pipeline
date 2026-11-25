@@ -102,6 +102,9 @@ def simulate_race(
     n_replays: int = 3,
     pass_ease: float = PASS_EASE,
     pass_power: float = PASS_POWER,
+    pass_k: float | None = None,
+    pass_threshold_s: float = PASS_THRESHOLD_S,
+    dirty_air_pct: float = DIRTY_AIR_PCT,
 ) -> RaceResult:
     """``grid``: (sims, drivers) starting positions, e.g. ``QualiResult.grid``."""
     rng = np.random.default_rng(seed)
@@ -211,7 +214,11 @@ def simulate_race(
     stops = np.zeros((sims, n), int)
     replays = [{"positions": [], "sc": []} for _ in range(min(n_replays, sims))]
 
-    k_pass = pass_ease * float(circuit.get("passes_per_green_lap") or 0.5) ** pass_power
+    k_pass = (
+        pass_k
+        if pass_k is not None
+        else pass_ease * float(circuit.get("passes_per_green_lap") or 0.5) ** pass_power
+    )
     n_passes, n_green = 0, 0
 
     # ------------------------------------------------------------------ laps 2..N
@@ -258,7 +265,7 @@ def simulate_race(
         gap_start = np.empty_like(cum)
         np.put_along_axis(gap_start, start_order, gap_o, axis=1)
         following = (gap_start < DIRTY_AIR_GAP_S * 1000) & ~pitting
-        lap_ms = lap_ms + following * base_ms * DIRTY_AIR_PCT / 100 * ~(sc_now | vsc_now)[:, None]
+        lap_ms = lap_ms + following * base_ms * dirty_air_pct / 100 * ~(sc_now | vsc_now)[:, None]
 
         # racing in running order (held up unless a pass works)
         proposed = cum + lap_ms
@@ -282,7 +289,7 @@ def simulate_race(
             if not close.any():
                 continue
             advantage_s = np.clip(
-                (lap_o[:, p - 1] - lap_o[:, p]) / 1000 - PASS_THRESHOLD_S, 0, None
+                (lap_o[:, p - 1] - lap_o[:, p]) / 1000 - pass_threshold_s, 0, None
             )
             passes = rng.random(sims) < 1 - np.exp(-k_pass * advantage_s)
             held = close & ~passes
@@ -327,3 +334,94 @@ def simulate_race(
         passes_per_green_lap=n_passes / max(n_green, 1),
         replays=[{**r, "driver_ids": drivers["driver_id"].tolist()} for r in replays],
     )
+
+
+@dataclass(frozen=True)
+class PassCalibration:
+    k: float  # pass-probability slope
+    slipstream: float  # 0 = normal track; 1 = strongest tow (see calibrate_pass_k)
+    threshold_s: float  # pace advantage needed to pass (negative: the tow lets slower cars by)
+    dirty_air_pct: float  # time lost following closely (negative: the tow pulls cars closer)
+    achieved: float  # simulated passes per green lap
+    target: float  # measured passes per green lap
+
+    def race_kwargs(self) -> dict:
+        return {
+            "pass_k": self.k,
+            "pass_threshold_s": self.threshold_s,
+            "dirty_air_pct": self.dirty_air_pct,
+        }
+
+
+def slipstream_settings(strength: float) -> tuple[float, float]:
+    """Slipstream strength 0..1 -> (pass threshold s/lap, dirty-air % lap)."""
+    return PASS_THRESHOLD_S - 0.8 * strength, DIRTY_AIR_PCT - 0.6 * strength
+
+
+def calibrate_pass_k(
+    drivers: pd.DataFrame,
+    teams: pd.DataFrame,
+    tyres: pd.DataFrame,
+    circuit: dict,
+    grid: np.ndarray,
+    *,
+    target: float | None = None,
+    sims: int = 1000,
+    iterations: int = 8,
+    seed: int = 11,
+) -> PassCalibration:
+    """Calibrate overtaking for this circuit so the simulator reproduces the measured
+    on-track passes per green lap.
+
+    1. Bisect the pass-probability slope ``k`` (log scale, fixed seed).
+    2. If even near-certain passes fall short, the track's slipstream must be doing more
+       than our dirty-air model allows (e.g. the Las Vegas Strip): keep ``k`` high and
+       raise a single slipstream strength that lowers the pass threshold (slower cars can
+       be passed... by faster-on-the-straight cars) and turns dirty-air loss into a tow.
+
+    Everything that makes a track special is already in the measured rate, so matching it
+    per circuit captures it without modelling each effect separately.
+    """
+    target = float(target if target is not None else circuit.get("passes_per_green_lap") or 0.5)
+    g = grid[:sims]
+
+    def rate(k: float, strength: float = 0.0) -> float:
+        threshold, dirty = slipstream_settings(strength)
+        r = simulate_race(
+            drivers,
+            teams,
+            tyres,
+            circuit,
+            g,
+            seed=seed,
+            n_replays=0,
+            pass_k=k,
+            pass_threshold_s=threshold,
+            dirty_air_pct=dirty,
+        )
+        return r.passes_per_green_lap
+
+    k_max = 80.0
+    lo, hi = np.log(0.02), np.log(k_max)
+    for _ in range(iterations):
+        mid = (lo + hi) / 2
+        if rate(float(np.exp(mid))) < target:
+            lo = mid
+        else:
+            hi = mid
+    k = float(np.exp((lo + hi) / 2))
+    strength = 0.0
+    achieved = rate(k)
+    if achieved < 0.95 * target:  # slope saturated: the slipstream has to do the rest
+        k = k_max
+        s_lo, s_hi = 0.0, 1.0
+        for _ in range(iterations):
+            mid = (s_lo + s_hi) / 2
+            if rate(k, mid) < target:
+                s_lo = mid
+            else:
+                s_hi = mid
+        strength = (s_lo + s_hi) / 2
+        achieved = rate(k, strength)
+    threshold, dirty = slipstream_settings(strength)
+    return PassCalibration(k, strength, threshold, dirty, achieved, target)
