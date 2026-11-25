@@ -22,7 +22,7 @@ COLS = ("p_win", "p_podium", "p_points")
 # 2026. From the actual grid the slot history carries most of the information (log loss
 # 1.364 simulation only, 1.116 grid only, 1.105 at 0.85); before the weekend it doesn't
 # help once young drivers' development is modelled (1.727 at 0, worse above).
-GRID_BLEND = {"post_quali": 0.85, "pre_weekend": 0.0}
+GRID_BLEND = {"post_quali": 0.85, "pre_weekend": 0.0, "post_practice": 0.0}
 
 
 def grid_prior(grid: np.ndarray, table: pd.DataFrame) -> pd.DataFrame:
@@ -42,10 +42,13 @@ def grid_prior(grid: np.ndarray, table: pd.DataFrame) -> pd.DataFrame:
 
 
 QUALI_COLS = ("p_pole", "p_top3_grid", "p_top10")
-# Pole chances before the weekend: weights of the simple qualifying baselines (frequencies
-# by last qualifying position / championship position), learned on 2025 (tune.py --quali:
-# pole log loss 1.89 at these weights).
-QUALI_BLEND = {"previous_quali": 0.40, "championship": 0.25}
+# Pole chances per stage: weights of the simple qualifying baselines (frequencies by last
+# qualifying position / championship position), learned on 2025 (tune.py --quali).
+# Pole log loss on 2025: before the weekend 1.89, after practice 1.84 (1.91 unblended).
+QUALI_BLEND = {
+    "pre_weekend": {"previous_quali": 0.40, "championship": 0.25},
+    "post_practice": {"previous_quali": 0.30, "championship": 0.25},
+}
 
 
 def blend_many(

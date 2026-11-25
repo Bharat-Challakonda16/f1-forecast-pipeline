@@ -23,6 +23,10 @@ SELECT 'gold unique: driver_session_pace(kind, season, round, driver)', 'error',
        array_join(slice(collect_list(concat(kind, ':', season, ':', round, ':', driver_id)), 1, 5), ', ')
 FROM (SELECT kind, season, round, driver_id FROM ${catalog}.gold.driver_session_pace GROUP BY ALL HAVING count(*) > 1);
 
+SELECT 'gold unique: driver_practice_pace(season, round, session, driver)', 'error', count(*),
+       array_join(slice(collect_list(concat(season, ':', round, ':', session_code, ':', driver_id)), 1, 5), ', ')
+FROM (SELECT season, round, session_code, driver_id FROM ${catalog}.gold.driver_practice_pace GROUP BY ALL HAVING count(*) > 1);
+
 SELECT 'gold unique: car_profiles(team, season, round)', 'error', count(*), array_join(slice(collect_list(constructor_id), 1, 5), ', ')
 FROM (SELECT constructor_id, season, as_of_round FROM ${catalog}.gold.car_profiles GROUP BY ALL HAVING count(*) > 1);
 

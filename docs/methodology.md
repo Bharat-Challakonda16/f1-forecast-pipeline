@@ -160,15 +160,41 @@ hold the learned spreads, `effect = debut` the first season). Version `field_rw_
 takes ~40 s per kind. A per-round driver-form walk within a season was also tried: it
 learned ~0.01% per round and was removed.
 
+## After practice
+
+Practice shows this car, this driver, this track, this weekend, but fuel loads and
+programmes are unknown. `gold.driver_practice_pace` (2018+) measures per practice session:
+
+- **Best lap** relative to the session median.
+- **Long runs**: stints of ≥5 consecutive valid laps, compared with other drivers' long runs
+  on the same compound.
+
+On its own, the mean best-lap pace over the practice sessions correlates 0.81 with
+qualifying pace and 0.71 with race pace (dry, 2018–24). Last race's pace scores 0.74 and
+0.66.
+
+The model turns practice into a **surprise**: practice pace minus the pace the model
+expected. That surprise is split into the team part (the car) and the driver-vs-teammate
+part. A share of each shifts car and driver pace (`sim/practice.py`). The shares were learned
+on 2025 by regressing what happened in qualifying and the race, beyond the model's
+expectation, on the practice surprise (210 team-weekends):
+
+| | Team (car) | Driver vs teammate | Weekend spread left |
+|---|---|---|---|
+| Qualifying | 0.55 × best-lap surprise | 0.18 | 84% |
+| Race | 0.11 × best-lap + 0.27 × long-run surprise | 0.20 | 96% |
+
+Practice says a lot about qualifying and a little about the race.
+
 ## From simulation to final probabilities
 
 The simulator makes races more open than they are. The pole sitter has won 55% of races
 since 2014, and the simulation gives less. So final race probabilities blend the
 simulation with how often each grid slot produced the outcome in the four previous seasons
 (`sim/blend.py`). After qualifying the weight of the grid history is 0.85. Before the
-weekend it is 0, because there it didn't help. Pole probabilities blend the model with last
-qualifying order (0.40) and championship order (0.25). All weights were learned on 2025
-and tested on 2026. Results are in [backtest_report.md](backtest_report.md).
+weekend and after practice it is 0, because there it didn't help. Pole probabilities blend
+the model with last qualifying order and championship order: 0.40 / 0.25 before the
+weekend, 0.30 / 0.25 after practice. All weights were learned on 2025 and tested on 2026. Results are in [backtest_report.md](backtest_report.md).
 
 ## Tyre models (2019+)
 

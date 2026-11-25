@@ -156,9 +156,9 @@ def score_blend(ev, a: pd.DataFrame, sims: int, table: pd.DataFrame) -> list[dic
     return rows
 
 
-def run_quali(season: int, model_version: str) -> pd.DataFrame:
+def run_quali(season: int, model_version: str, stage: str = "pre_weekend") -> pd.DataFrame:
     """Weights of the qualifying baselines in the pole blend, from the stored (unblended)
-    pre-weekend predictions of ``model_version``. Scored by pole log loss / Brier."""
+    ``stage`` predictions of ``model_version``. Scored by pole log loss / Brier."""
     from databricks.sdk import WorkspaceClient
 
     from f1_forecast.backtest.metrics import event_scores
@@ -179,7 +179,7 @@ def run_quali(season: int, model_version: str) -> pd.DataFrame:
         SELECT round, driver_id, p_pole, p_top3_grid, p_top10, expected_grid
         FROM {CATALOG}.gold.predictions
         WHERE model_version = '{model_version}' AND season = {season}
-          AND stage = 'pre_weekend'""")
+          AND stage = '{stage}'""")
     for c in ("round", *QUALI_COLS, "expected_grid"):
         pred[c] = pd.to_numeric(pred[c])
     q = hist[(hist["season"] == season) & (hist["session_code"] == "R")]
@@ -202,6 +202,93 @@ def run_quali(season: int, model_version: str) -> pd.DataFrame:
     keys = ["w_previous_quali", "w_championship"]
     out = df.groupby(keys)[["log_loss_pole", "brier_pole", "pole_hit", "top3_hits"]].mean()
     return out.sort_values("log_loss_pole").reset_index()
+
+
+def practice_rows(ctx, catalog: str, season: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(practice pace rows, actual dry session pace rows) for one season."""
+    fp = ctx.q(f"""
+        SELECT round, session_code, driver_id, best_pct, long_pct, long_laps
+        FROM {catalog}.gold.driver_practice_pace WHERE season = {season} AND NOT is_outlier""")
+    sp = ctx.q(f"""
+        SELECT kind, round, driver_id, pace_pct FROM {catalog}.gold.driver_session_pace
+        WHERE season = {season} AND NOT is_wet AND NOT is_outlier""")
+    for df, cols in (
+        (fp, ("round", "best_pct", "long_pct", "long_laps")),
+        (sp, ("round", "pace_pct")),
+    ):
+        for c in cols:
+            df[c] = pd.to_numeric(df[c])
+    return fp, sp
+
+
+def practice_frame(ev, fp: pd.DataFrame, sp: pd.DataFrame, rnd: int) -> pd.DataFrame:
+    """Per driver: practice surprise parts and the actual qualifying / race surprise (actual
+    pace minus the model's expectation, both centred on the drivers with data)."""
+    from f1_forecast.sim.practice import expected_pace, practice_surprise
+
+    s = practice_surprise(ev.drivers, ev.teams, fp[fp["round"] == rnd])
+    s["constructor_id"] = ev.drivers["constructor_id"].to_numpy()
+    for kind in ("quali", "race"):
+        act = (
+            sp[(sp["round"] == rnd) & (sp["kind"] == kind)]
+            .set_index("driver_id")["pace_pct"]
+            .reindex(ev.drivers["driver_id"])
+            .to_numpy(float)
+        )
+        exp = expected_pace(ev.drivers, ev.teams, kind)
+        has = np.isfinite(act)
+        y = np.full(len(act), np.nan)
+        if has.sum() >= 10:
+            y[has] = (act[has] - act[has].mean()) - (exp[has] - exp[has].mean())
+        s[f"y_{kind}"] = y
+    s["round"] = rnd
+    return s
+
+
+def fit_practice(df: pd.DataFrame) -> pd.DataFrame:
+    """No-intercept least squares of the team / driver parts of the actual surprise on the
+    practice surprise, plus how much of the team-level spread is left over."""
+    rows = []
+    for kind, xs in (("quali", ["team_q"]), ("race", ["team_q", "team_long"])):
+        d = df.dropna(subset=[f"y_{kind}"])
+        team = d.groupby(["round", "constructor_id"]).agg(
+            y=(f"y_{kind}", "mean"), **{x: (x, "first") for x in xs}
+        )
+        xm, y = team[xs].to_numpy(float), team["y"].to_numpy(float)
+        beta = np.linalg.lstsq(xm, y, rcond=None)[0]
+        resid = y - xm @ beta
+        rows += [{"kind": kind, "term": x, "coef": b} for x, b in zip(xs, beta, strict=True)]
+        rows.append(
+            {"kind": kind, "term": "form_scale", "coef": float(np.sqrt(resid.var() / y.var()))}
+        )
+        dev = d[f"y_{kind}"] - d.groupby(["round", "constructor_id"])[f"y_{kind}"].transform("mean")
+        x = d["driver_q"].to_numpy(float)
+        b = float(np.dot(x, dev) / np.dot(x, x))
+        rows.append({"kind": kind, "term": "driver_q", "coef": b})
+        rows.append({"kind": kind, "term": "n_team_obs", "coef": float(len(team))})
+    return pd.DataFrame(rows)
+
+
+def run_practice(season: int, cache: Path) -> pd.DataFrame:
+    from databricks.sdk import WorkspaceClient
+
+    from f1_forecast.backtest.race_backtest import CATALOG, Ctx, history
+
+    w = WorkspaceClient()
+    ctx = Ctx(w, next(iter(w.warehouses.list())).id)
+    events = ctx.q(f"""
+        SELECT round, race_date FROM {CATALOG}.silver.events
+        WHERE season = {season} AND status = 'completed' ORDER BY round""")
+    hist = history(ctx, season)
+    res = hist[(hist["season"] == season) & (hist["session_code"] == "R")]
+    fp, sp = practice_rows(ctx, CATALOG, season)
+    cache.mkdir(parents=True, exist_ok=True)
+    frames = []
+    for e in events.itertuples():
+        rnd = int(e.round)
+        ev, _ = load_round(season, rnd, date.fromisoformat(str(e.race_date)[:10]), res, cache)
+        frames.append(practice_frame(ev, fp, sp, rnd))
+    return fit_practice(pd.concat(frames, ignore_index=True))
 
 
 def run(season: int, sims: int, cache: Path, *, mode_blend: bool = False) -> pd.DataFrame:
@@ -239,10 +326,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument(
         "--quali", metavar="MODEL_VERSION", help="learn the pole blend from stored predictions"
     )
+    p.add_argument("--practice", action="store_true", help="learn the after-practice shares")
+    p.add_argument("--stage", default="pre_weekend", help="stage for --quali")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    if args.quali:
-        out = run_quali(args.season, args.quali).head(15)
+    if args.practice:
+        out = run_practice(args.season, args.cache)
+    elif args.quali:
+        out = run_quali(args.season, args.quali, args.stage).head(15)
     else:
         out = run(args.season, args.sims, args.cache, mode_blend=args.blend)
     with pd.option_context("display.max_rows", 200):

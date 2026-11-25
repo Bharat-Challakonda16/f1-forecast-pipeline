@@ -40,26 +40,28 @@ Pipelines are incremental and idempotent: downloads never repeat (landed files a
 
 **How good is it? (Phase 3 backtest, 2026 season, settings tuned on 2025 only)**
 
-| Before the weekend | Model | Best simple rule |
+| Before qualifying | Model | Best simple rule |
 |---|---|---|
-| Winner log loss (lower is better) | **1.65** | 1.87 (championship order) |
+| Winner log loss (lower is better), before the weekend | **1.65** | 1.88 (championship order) |
+| Winner log loss, after practice | **1.58** | 1.88 |
 | Podium finishers picked | **54%** | 52% (previous race) |
+| Pole log loss, after practice | **1.93** | 2.05 (championship order) |
 
 | After qualifying | Model | Grid order |
 |---|---|---|
 | Winner log loss | **1.10** | 1.27 |
 | Winner picked | 71% | 71% |
 
-Probabilities are well calibrated. The weak spot is the model's single favourite before
-the weekend: it won 5 of 21 races, against 7 for the championship leader. See
-[docs/backtest_report.md](docs/backtest_report.md).
+Probabilities are well calibrated. The weak spot is the model's single favourite in 2026:
+before qualifying it won 4–5 of 21 races, against 7 for the championship leader. In 2025
+it did better than the simple rules. See [docs/backtest_report.md](docs/backtest_report.md).
 
 ## Phase checklist
 
 - [x] **0. Setup:** repo, tooling, CI, Databricks catalog/schemas, hello Delta job
 - [x] **1. Data pipeline:** Jolpica (2001+), OpenF1 (2023+), FastF1 (2018–22), Open-Meteo history, 2027 calendar, circuit facts; bronze → silver; 33 DQ checks; idempotency proven
 - [x] **2. Features:** Bayesian driver traits (7, since 2001), car profiles incl. telemetry corner speeds, tyre models, safety-car / incident rates, pace trends; 36 known-fact and quality checks
-- [x] **3. Simulator:** qualifying model, vectorised lap-by-lap race sim (strategies, safety cars, overtaking calibrated per circuit), season and championship odds, joint car / driver / track model, leak-free backtests tuned on 2025 and tested on 2026
+- [x] **3. Simulator:** qualifying model, vectorised lap-by-lap race sim (strategies, safety cars, overtaking calibrated per circuit), season and championship odds, joint car / driver / track model, after-practice update, leak-free backtests tuned on 2025 and tested on 2026
 - [ ] **4. MVP launch:** Streamlit app
 - [ ] **5. Weather pipeline:** staged weather, track-temp calibration, daily refresh, prediction versioning
 - [ ] **6. Constructors + news:** development carry-over, LLM news signals, news backtest

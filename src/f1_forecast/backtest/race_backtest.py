@@ -46,6 +46,7 @@ from f1_forecast.sim.blend import (
     grid_prior,
 )
 from f1_forecast.sim.inputs import load_event_inputs
+from f1_forecast.sim.practice import apply_practice, practice_surprise
 from f1_forecast.sim.quali import observed_team_surprise, simulate_qualifying
 from f1_forecast.sim.race import calibrate_pass_k, simulate_race
 
@@ -56,7 +57,8 @@ log = logging.getLogger(__name__)
 # sim_v4: + lap-1 spread growing down the grid, retirement rates scaled to the field level.
 # sim_v5: + race-pace spread x0.7, blended with grid-slot frequencies (both tuned on 2025).
 # sim_v6: + young drivers' faster year-to-year change (field_rw_v2), pole blend.
-MODEL_VERSION = "sim_v6"
+# sim_v7: + after-practice stage (practice pace shifts car / driver pace, tuned on 2025).
+MODEL_VERSION = "sim_v7"
 
 
 @dataclass
@@ -140,7 +142,13 @@ def baseline_ranks(hist: pd.DataFrame, season: int, rnd: int, drivers: list[str]
         if s.isna().all():
             s = pd.Series(0.0, index=drivers)  # nothing known: everyone equal
         s = s.fillna(s.max() + 1 if ascending else s.min() - 1)
-        return s.rank(ascending=ascending, method="first").to_numpy().astype(int)
+        # ties (e.g. equal points) broken by driver id, so every stage ranks alike
+        order = pd.DataFrame({"s": s.to_numpy(), "d": drivers}).sort_values(
+            ["s", "d"], ascending=[ascending, True]
+        )
+        ranks = np.empty(len(drivers), dtype=int)
+        ranks[order.index.to_numpy()] = np.arange(1, len(drivers) + 1)
+        return ranks
 
     out = {
         "championship": rank_by(standings, ascending=False),
@@ -230,9 +238,11 @@ def predict_round(
     actual: pd.DataFrame,
     use_field: bool = True,
     grid_table: pd.DataFrame | None = None,
+    practice: pd.DataFrame | None = None,
 ):
     """``grid_table``: frequencies by grid slot from earlier seasons; if given, the race
-    probabilities are blended with them (``sim/blend.py``)."""
+    probabilities are blended with them (``sim/blend.py``). ``practice``: this weekend's
+    rows of ``gold.driver_practice_pace`` for the after-practice stage."""
     ev = load_event_inputs(season, rnd, as_of, use_field=use_field)
     # Score only drivers who actually raced (the entry list is known before a weekend).
     ev.drivers = ev.drivers[ev.drivers["driver_id"].isin(actual["driver_id"])].reset_index(
@@ -267,6 +277,25 @@ def predict_round(
         quali_surprise=q.team_surprise,
         **calib.race_kwargs(),
     )
+    # after practice: same estimate draws, car / driver pace shifted by practice
+    fp = practice if practice is not None else pd.DataFrame()
+    dp, tp = apply_practice(ev.drivers, ev.teams, practice_surprise(ev.drivers, ev.teams, fp))
+    qp = simulate_qualifying(
+        dp, tp, speed_profile=ev.circuit["speed_profile"], sims=sims, car_z=car_z, skill_z=skill_z
+    )
+    pp = simulate_race(
+        dp,
+        tp,
+        ev.tyres,
+        ev.circuit,
+        qp.grid,
+        seed=9,
+        n_replays=0,
+        car_z=car_z,
+        skill_z=skill_z,
+        quali_surprise=qp.team_surprise,
+        **calib.race_kwargs(),
+    )
     best = actual.set_index("driver_id")["quali_best_ms"].astype(float)
     quali_pct = 100 * np.log(best / best.median())
     surprise = observed_team_surprise(ev.drivers, ev.teams, quali_pct, ev.circuit["speed_profile"])
@@ -292,16 +321,26 @@ def predict_round(
         quali_surprise=surprise,
         **calib.race_kwargs(),
     )
-    qs = q.summary().drop(columns="grid_distribution").rename(columns={"p_top3": "p_top3_grid"})
+
+    def qsum(r):
+        return (
+            r.summary().drop(columns="grid_distribution").rename(columns={"p_top3": "p_top3_grid"})
+        )
+
     rows = []
-    for stage, res, g in (("pre_weekend", pre, q.grid), ("post_quali", post, grid_actual)):
+    for stage, res, g, qs in (
+        ("pre_weekend", pre, q.grid, qsum(q)),
+        ("post_practice", pp, qp.grid, qsum(qp)),
+        ("post_quali", post, grid_actual, None),
+    ):
         s = res.summary()
         if grid_table is not None:
             prior = grid_prior(g, grid_table)
             prior["driver_id"] = res.driver_ids
             prior = prior.set_index("driver_id").reindex(s["driver_id"]).reset_index()
             s = blend(s, prior, GRID_BLEND[stage])
-        s = s.merge(qs if stage == "pre_weekend" else qs[["driver_id"]], on="driver_id", how="left")
+        if qs is not None:
+            s = s.merge(qs, on="driver_id", how="left")
         s["stage"] = stage
         rows.append(s)
     pred = pd.concat(rows, ignore_index=True)
@@ -352,6 +391,11 @@ def run(
         events = events[events["round"].isin(rounds)]
     hist = history(ctx, season)
     freq = frequency_tables(hist, season)
+    practice = ctx.q(f"""
+        SELECT round, session_code, driver_id, best_pct, long_pct, long_laps
+        FROM {CATALOG}.gold.driver_practice_pace WHERE season = {season} AND NOT is_outlier""")
+    for c in ("round", "best_pct", "long_pct", "long_laps"):
+        practice[c] = pd.to_numeric(practice[c])
     created = datetime.now(UTC).replace(tzinfo=None)
     run_id = uuid.uuid4().hex[:8]
 
@@ -368,19 +412,28 @@ def run(
         ]
         actual = races[["driver_id", "grid", "position", "quali_position", "quali_best_ms"]].copy()
         pred, ev = predict_round(
-            ctx, season, rnd, as_of, sims, actual, use_field, grid_table=freq["grid"]
+            ctx,
+            season,
+            rnd,
+            as_of,
+            sims,
+            actual,
+            use_field,
+            grid_table=freq["grid"],
+            practice=practice[practice["round"] == rnd],
         )
-        pre = pred["stage"] == "pre_weekend"
-        priors = quali_priors(hist, freq, season, rnd, pred.loc[pre, "driver_id"].tolist())
-        pred.loc[pre, list(QUALI_COLS)] = blend_many(
-            pred.loc[pre].reset_index(drop=True), priors, QUALI_BLEND, QUALI_COLS
-        )[list(QUALI_COLS)].to_numpy()
+        for stage, weights in QUALI_BLEND.items():
+            m = pred["stage"] == stage
+            priors = quali_priors(hist, freq, season, rnd, pred.loc[m, "driver_id"].tolist())
+            pred.loc[m, list(QUALI_COLS)] = blend_many(
+                pred.loc[m].reset_index(drop=True), priors, weights, QUALI_COLS
+            )[list(QUALI_COLS)].to_numpy()
         pred["snapshot_id"] = pred["stage"] + f":{season}_{rnd:02d}:{as_of}:{model_version}"
         pred["model_version"], pred["created_at"] = model_version, created
         all_preds.append(pred)
 
         a = actual.set_index("driver_id")
-        for stage in ("pre_weekend", "post_quali"):
+        for stage in ("pre_weekend", "post_practice", "post_quali"):
             p = pred[pred["stage"] == stage].copy()
             p["actual_rank"] = a["position"].reindex(p["driver_id"]).to_numpy()
             all_scores.append(
@@ -402,15 +455,20 @@ def run(
                         **event_scores(b),
                     }
                 )
-        # qualifying (pre-weekend only)
-        p = pred[pred["stage"] == "pre_weekend"].copy()
-        p["actual_rank"] = a["quali_position"].reindex(p["driver_id"]).to_numpy()
-        if p["actual_rank"].notna().sum() >= 10:
+        # qualifying: before the weekend and after practice
+        for stage, label in (
+            ("pre_weekend", "qualifying"),
+            ("post_practice", "qualifying_post_practice"),
+        ):
+            p = pred[pred["stage"] == stage].copy()
+            p["actual_rank"] = a["quali_position"].reindex(p["driver_id"]).to_numpy()
+            if p["actual_rank"].notna().sum() < 10:
+                continue
             p["actual_rank"] = p["actual_rank"].fillna(99).rank(method="first")
             all_scores.append(
                 {
                     "round": rnd,
-                    "stage": "qualifying",
+                    "stage": label,
                     "method": "model",
                     "kind": "quali",
                     **event_scores(p, kind="quali"),
@@ -422,7 +480,7 @@ def run(
                 all_scores.append(
                     {
                         "round": rnd,
-                        "stage": "qualifying",
+                        "stage": label,
                         "method": name,
                         "kind": "quali",
                         **event_scores(b, kind="quali"),
@@ -498,6 +556,8 @@ def run(
     for stage, col, outcome in (
         ("pre_weekend", "p_podium", 3),
         ("pre_weekend", "p_win", 1),
+        ("post_practice", "p_win", 1),
+        ("post_practice", "p_podium", 3),
         ("post_quali", "p_podium", 3),
     ):
         p = preds[preds["stage"] == stage].merge(

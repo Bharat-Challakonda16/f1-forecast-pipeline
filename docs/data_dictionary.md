@@ -81,6 +81,7 @@ Row counts as of **2026-11-24** (data through the 2026 Las Vegas GP, round 21).
 | `quali_best_lap_telemetry`, `corner_speeds`, `car_corner_profiles` | lap samples / session x team / team x round | telemetry corner speeds by class |
 | `tyre_stints`, `tyre_temp_sensitivity`, `tyre_models` | stint / compound / circuit x compound | wear, temperature effect, fresh-tyre pace, stint lengths |
 | `driver_session_pace` | kind (quali / race), season, round, driver | pace vs the session median (best qualifying lap / median clean race lap), wet and outlier flags; input of the field model |
+| `driver_practice_pace` | season, round, practice session, driver | 2018+: best-lap pace vs the session median, long-run pace vs other long runs on the same compound; input of the after-practice stage |
 
 ## Gold (Phase 3 model outputs and backtests)
 
