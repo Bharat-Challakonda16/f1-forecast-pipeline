@@ -89,6 +89,8 @@ def test_unknown_track_type_has_no_type_effect():
 
 @pytest.mark.slow
 def test_fit_recovers_upgrade_and_track_bonus():
+    pytest.importorskip("pymc")
+    pytest.importorskip("nutpie")
     from f1_forecast.features.field_model import fit
 
     df, truth = synthetic()
