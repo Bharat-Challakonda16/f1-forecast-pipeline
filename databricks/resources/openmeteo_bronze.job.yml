@@ -19,4 +19,4 @@ resources:
             base_parameters:
               catalog: ${var.catalog}
               source: openmeteo
-              tables: archive
+              tables: archive,forecast,ensemble,previous_runs

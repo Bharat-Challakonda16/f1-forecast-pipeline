@@ -48,7 +48,10 @@ class Circuit:
 
 
 def request_cost(days: int, n_vars: int) -> float:
-    return max(1.0, days / 14 * n_vars / 10)
+    """Open-Meteo units: (days / 14, at least 1) x (variables / 10), at least 1 overall.
+    Matches the X-RateLimit-Cost header (archive 366 d x 11 vars = 28.8; ensemble 3 d x
+    2 vars x 51 members = 10.2; forecast 3 d x 9 vars = 1)."""
+    return max(1.0, max(1.0, days / 14) * n_vars / 10)
 
 
 def settled_months(start: date, today: date, settle_days: int) -> list[tuple[int, int]]:

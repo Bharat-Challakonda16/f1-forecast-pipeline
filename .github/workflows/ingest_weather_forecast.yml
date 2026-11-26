@@ -1,0 +1,43 @@
+name: Ingest weather forecasts
+
+# Daily weather forecast snapshot for every race in the next 16 days (hourly + ECMWF
+# ensemble), and past forecasts (1-7 days ahead) for races that have just finished.
+# Runs before the 09:00 silver/gold build so the 10:30 Forecast uses today's weather.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 8 * * *"
+
+concurrency:
+  group: ingest-openmeteo-forecast
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      LANDING: /Volumes/f1_forecast/bronze/landing
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install .
+
+      - name: Land forecasts
+        id: land
+        run: python -m f1_forecast.ingest.weather_forecast --store volume --location "$LANDING"
+
+      - name: Load bronze tables
+        if: steps.land.outputs.landed != '0'
+        run: python -m f1_forecast.ops.run_job f1_forecast_openmeteo_bronze --timeout-min 60

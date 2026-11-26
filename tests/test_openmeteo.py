@@ -22,6 +22,7 @@ def test_request_cost_matches_observed_headers():
     assert request_cost(14, 11) == pytest.approx(1.1)
     assert request_cost(366, 11) == pytest.approx(28.757, rel=1e-3)
     assert request_cost(3, 2) == 1.0  # minimum one unit
+    assert request_cost(3, 102) == pytest.approx(10.2)  # ensemble: short range, many members
 
 
 def test_settled_months_stops_before_unsettled_month():

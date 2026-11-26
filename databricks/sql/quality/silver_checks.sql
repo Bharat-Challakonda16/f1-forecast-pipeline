@@ -50,6 +50,21 @@ SELECT 'unique: weather_hourly(circuit_id, time_utc)', 'error', count(*),
        array_join(slice(collect_list(concat(circuit_id, '@', time_utc)), 1, 5), ', ')
 FROM (SELECT circuit_id, time_utc FROM ${catalog}.silver.weather_hourly GROUP BY ALL HAVING count(*) > 1);
 
+SELECT 'unique: weather_forecasts(season, round, source, issued, lead, time)', 'error', count(*),
+       array_join(slice(collect_list(concat(season, '/', round, ' ', time_utc)), 1, 5), ', ')
+FROM (SELECT season, round, source, issued_utc, lead_days, time_utc
+      FROM ${catalog}.silver.weather_forecasts GROUP BY ALL HAVING count(*) > 1);
+
+SELECT 'unique: weather_ensemble(season, round, issued, time, member)', 'error', count(*),
+       array_join(slice(collect_list(concat(season, '/', round, ' ', time_utc)), 1, 5), ', ')
+FROM (SELECT season, round, issued_utc, time_utc, member
+      FROM ${catalog}.silver.weather_ensemble GROUP BY ALL HAVING count(*) > 1);
+
+SELECT 'fk: weather_forecasts -> events', 'error', count(*),
+       array_join(slice(collect_set(concat(f.season, '/', f.round)), 1, 5), ', ')
+FROM (SELECT DISTINCT season, round FROM ${catalog}.silver.weather_forecasts) f
+LEFT ANTI JOIN ${catalog}.silver.events e USING (season, round);
+
 -- ------------------------------------------------------------------ required values
 
 SELECT 'not null: laps keys', 'error', count(*), array_join(slice(collect_list(session_id), 1, 5), ', ')
@@ -137,6 +152,12 @@ SELECT 'range: hourly weather values', 'error', count(*),
 FROM ${catalog}.silver.weather_hourly
 WHERE temp_c NOT BETWEEN -40 AND 60 OR precipitation_mm < 0 OR humidity_pct NOT BETWEEN 0 AND 100
    OR cloud_cover_pct NOT BETWEEN 0 AND 100;
+
+SELECT 'range: forecast weather values', 'error', count(*),
+       array_join(slice(collect_list(concat(season, '/', round, ' ', source, ' ', time_utc)), 1, 5), ', ')
+FROM ${catalog}.silver.weather_forecasts
+WHERE temp_c NOT BETWEEN -40 AND 60 OR precipitation_mm < 0 OR lead_days NOT BETWEEN 0 AND 16
+   OR humidity_pct NOT BETWEEN 0 AND 100 OR cloud_cover_pct NOT BETWEEN 0 AND 100;
 
 SELECT 'range: pit stop total time 10s-120s', 'warn', count(*),
        array_join(slice(collect_list(concat(session_id, ':', driver_id, '=', pit_duration_ms)), 1, 5), ', ')

@@ -60,3 +60,53 @@ SELECT
   double(surface_pressure) AS pressure_hpa,
   int(weather_code) AS weather_code
 FROM ${catalog}.bronze.openmeteo_archive;
+
+CREATE OR REPLACE TABLE ${catalog}.silver.weather_forecasts
+COMMENT 'Hourly forecasts for race weekends (Open-Meteo, UTC). source previous_runs: what the forecast issued lead_days before said (2024+, lead 0-7; 0 = latest run). source live: daily snapshots, issued_utc = download time. lead_days = target day - issue day'
+CLUSTER BY (season, round)
+AS
+WITH past AS (
+  SELECT
+    int(season) AS season, int(round) AS round, circuit_ref AS circuit_id,
+    'previous_runs' AS source,
+    CAST(NULL AS TIMESTAMP) AS issued_utc,
+    to_timestamp(time, "yyyy-MM-dd'T'HH:mm") AS time_utc,
+    int(lead_days) AS lead_days,
+    double(precipitation) AS precipitation_mm,
+    CAST(NULL AS DOUBLE) AS precipitation_prob_pct,
+    double(temperature_2m) AS temp_c,
+    double(relative_humidity_2m) AS humidity_pct,
+    least(double(cloud_cover), 100.0) AS cloud_cover_pct,  -- source rarely gives 101
+    double(shortwave_radiation) AS solar_radiation_wm2,
+    double(wind_speed_10m) AS wind_speed_kmh
+  FROM ${catalog}.bronze.openmeteo_previous_runs
+),
+live AS (
+  SELECT
+    int(season), int(round), circuit_ref,
+    'live',
+    to_timestamp(issued_utc, "yyyy-MM-dd'T'HH:mm"),
+    to_timestamp(time, "yyyy-MM-dd'T'HH:mm") AS t,
+    datediff(to_date(to_timestamp(time, "yyyy-MM-dd'T'HH:mm")),
+             to_date(to_timestamp(issued_utc, "yyyy-MM-dd'T'HH:mm"))),
+    double(precipitation), double(precipitation_probability), double(temperature_2m),
+    double(relative_humidity_2m), least(double(cloud_cover), 100.0), double(shortwave_radiation),
+    double(wind_speed_10m)
+  FROM ${catalog}.bronze.openmeteo_forecast
+)
+SELECT * FROM past
+UNION ALL
+SELECT * FROM live;
+
+CREATE OR REPLACE TABLE ${catalog}.silver.weather_ensemble
+COMMENT 'ECMWF ensemble forecasts (51 members, member 0 = control) for race weekends, daily snapshots (UTC)'
+CLUSTER BY (season, round)
+AS
+SELECT
+  int(season) AS season, int(round) AS round, circuit_ref AS circuit_id,
+  to_timestamp(issued_utc, "yyyy-MM-dd'T'HH:mm") AS issued_utc,
+  to_timestamp(time, "yyyy-MM-dd'T'HH:mm") AS time_utc,
+  int(member) AS member,
+  double(precipitation) AS precipitation_mm,
+  double(temperature_2m) AS temp_c
+FROM ${catalog}.bronze.openmeteo_ensemble;

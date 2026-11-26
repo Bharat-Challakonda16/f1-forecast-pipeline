@@ -68,16 +68,21 @@ sources:
     docs: "https://openf1.org/"
 
   open_meteo:
-    description: "Weather: archive (climate base rates), seasonal outlook, 16-day hourly forecast"
+    description: "Weather: archive (climate base rates), 16-day forecast + ensemble, past forecasts"
     license: "Free for non-commercial use; CC BY 4.0 attribution required"
     auth: none
     endpoints:
       archive: "https://archive-api.open-meteo.com/v1/archive"
       forecast: "https://api.open-meteo.com/v1/forecast"
+      ensemble: "https://ensemble-api.open-meteo.com/v1/ensemble"
+      # What the forecast said 1..7 days before each hour; coverage from early 2024.
+      previous_runs: "https://previous-runs-api.open-meteo.com/v1/forecast"
+      # Not used: monthly-scale outlooks carry no skill for one afternoon's rain.
       seasonal: "https://seasonal-api.open-meteo.com/v1/seasonal"
     forecast_horizon_days: 16
-    # Request cost (headers verified 2026-11-24): (days / 14) * (variables / 10), min 1.
-    # One circuit-year of these 11 hourly variables costs ~28.8 units.
+    # Request cost (headers verified 2026-11-25): max(1, days / 14) * (variables / 10), min 1.
+    # Ensemble members count as variables. One circuit-year of the 11 archive variables
+    # costs ~28.8 units.
     archive_hourly:
       - temperature_2m
       - relative_humidity_2m
