@@ -12,9 +12,10 @@ st_testing = pytest.importorskip("streamlit.testing.v1")
 APP = Path(__file__).resolve().parent.parent / "app"
 PAGES = [
     "streamlit_app.py",
-    "pages/1_Championship.py",
-    "pages/2_How_accurate.py",
-    "pages/3_About.py",
+    "views/next_race.py",
+    "views/championship.py",
+    "views/accuracy.py",
+    "views/about.py",
 ]
 
 
