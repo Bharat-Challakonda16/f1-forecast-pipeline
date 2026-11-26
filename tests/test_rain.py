@@ -93,3 +93,19 @@ def test_outlook_frame_without_forecasts_is_climate():
     out = outlook_frame(SESSIONS, climate, _fc([]), "2026-11-20", COEFS).set_index("session_code")
     assert out.loc["Q", "p_wet"] == pytest.approx(out.loc["Q", "p_climate"])
     assert out.loc["R", "p_climate"] == pytest.approx(0.08)  # no samples: recent average
+
+
+def test_track_temp_warmer_than_air_and_rises_with_sun():
+    from f1_forecast.features.track_temp import predict
+
+    shade, sun = predict([25.0, 25.0], [0.0, 800.0])
+    assert shade > 25.0 and sun > shade + 10
+
+
+def test_outlook_track_temp_only_from_a_near_forecast():
+    climate = pd.DataFrame({"session_id": ["r"], "rain_mm": [0.0], "n": [10]})
+    fc = _fc([("r", "previous_runs", None, 2, 0.0)])
+    fc["temp_c"], fc["solar_radiation_wm2"] = 25.0, 500.0
+    out = outlook_frame(SESSIONS, climate, fc, "2026-11-27", COEFS).set_index("session_code")
+    assert out.loc["R", "track_temp_c"] > 30
+    assert np.isnan(out.loc["Q", "track_temp_c"])  # no forecast for qualifying here

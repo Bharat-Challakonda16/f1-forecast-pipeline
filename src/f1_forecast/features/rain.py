@@ -163,17 +163,17 @@ def pick_forecast(forecasts: pd.DataFrame, sessions: pd.DataFrame, as_of) -> pd.
     past = past[past["lead_days"] == want]
     past = past[~past["session_id"].isin(live["session_id"])]
     cols = ["session_id", "source", "forecast_mm", "lead_days"]
+    cols += [c for c in ("temp_c", "solar_radiation_wm2") if c in f]
     parts = [x[cols] for x in (live, past) if len(x)]
     out = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=cols)
     out = out[out["lead_days"] >= 0]
-    return out.rename(columns={"source": "forecast_source"})[
-        ["session_id", "forecast_mm", "lead_days", "forecast_source"]
-    ]
+    return out.rename(columns={"source": "forecast_source"})
 
 
 def session_outlook(season: int, rnd: int, as_of, *, w=None, wh=None) -> pd.DataFrame:
-    """Wet chance of each competitive session of an event as of ``as_of``: one row per
-    session_code with p_wet, p_climate, forecast_mm, lead_days, forecast_source."""
+    """Weather outlook of each competitive session of an event as of ``as_of``: one row
+    per session_code with p_wet, p_climate, forecast_mm, lead_days, forecast_source and
+    track_temp_c (from the forecast within MAX_LEAD days, else NaN)."""
     from f1_forecast.features.run_traits import query_df
 
     if w is None:
@@ -190,7 +190,14 @@ def session_outlook(season: int, rnd: int, as_of, *, w=None, wh=None) -> pd.Data
     )
     if sessions.empty:
         return pd.DataFrame(
-            columns=["session_code", "p_wet", "p_climate", "forecast_mm", "lead_days"]
+            columns=[
+                "session_code",
+                "p_wet",
+                "p_climate",
+                "forecast_mm",
+                "lead_days",
+                "track_temp_c",
+            ]
         )
     climate = query_df(w, wh, CLIMATE_SQL.format(cat=CATALOG, where=ev))
     climate["rain_mm"] = pd.to_numeric(climate["rain_mm"])
@@ -198,11 +205,13 @@ def session_outlook(season: int, rnd: int, as_of, *, w=None, wh=None) -> pd.Data
     fc = query_df(
         w,
         wh,
-        f"""SELECT session_id, source, issued_utc, lead_days, rain_mm AS forecast_mm
+        f"""SELECT session_id, source, issued_utc, lead_days, rain_mm AS forecast_mm,
+                   temp_c, solar_radiation_wm2
             FROM {CATALOG}.gold.session_rain_forecast s WHERE {ev}""",
     )
     fc["lead_days"] = pd.to_numeric(fc["lead_days"]).astype(int)
-    fc["forecast_mm"] = pd.to_numeric(fc["forecast_mm"])
+    for c in ("forecast_mm", "temp_c", "solar_radiation_wm2"):
+        fc[c] = pd.to_numeric(fc[c])
     return outlook_frame(sessions, climate, fc, as_of)
 
 
@@ -218,7 +227,15 @@ def outlook_frame(sessions, climate, forecasts, as_of, coefs: RainCoefs = COEFS)
     else:
         out[["forecast_mm", "lead_days", "forecast_source"]] = [np.nan, np.nan, None]
     out["p_wet"] = wet_probability(out["p_climate"], out["forecast_mm"], out["lead_days"], coefs)
-    return out.drop(columns="session_id")
+    out["track_temp_c"] = np.nan
+    if {"temp_c", "solar_radiation_wm2"} <= set(out.columns):
+        from f1_forecast.features.track_temp import predict
+
+        near = out["lead_days"].le(MAX_LEAD)
+        out.loc[near, "track_temp_c"] = predict(
+            out.loc[near, "temp_c"], out.loc[near, "solar_radiation_wm2"]
+        )
+    return out.drop(columns=["session_id", "temp_c", "solar_radiation_wm2"], errors="ignore")
 
 
 # --------------------------------------------------------------------------- data

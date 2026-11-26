@@ -4,7 +4,8 @@
 --                          window, whether it was wet (2018+: wet tyres on >= 10% of laps)
 --                          and the rain measured in the hourly weather history.
 --   session_rain_climate   the same UTC window on nearby days (+-7) of every earlier year at
---                          that circuit: the climate the wet chance starts from.
+--                          that circuit: the climate the wet chance (and, far from the race,
+--                          the track temperature) starts from.
 --   session_rain_forecast  the forecast rain in the window, per forecast issue and lead time
 --                          (past forecasts 2024+, and daily live snapshots).
 -- Window: one hour before the start to the typical end (race 2 h, others 1 h), because
@@ -51,7 +52,7 @@ SELECT s.*, CASE WHEN m.hours >= 2 THEN m.rain_mm END AS rain_mm
 FROM s LEFT JOIN measured m USING (session_id);
 
 CREATE OR REPLACE TABLE ${catalog}.gold.session_rain_climate
-COMMENT 'Per session: rain (mm) in the same UTC window on days -7..+7 around the session date in every earlier year (2001+) at the circuit'
+COMMENT 'Per session: rain (mm), mean air temperature and sunshine in the same UTC window on days -7..+7 around the session date in every earlier year (2001+) at the circuit'
 CLUSTER BY (session_id)
 AS
 WITH s AS (
@@ -77,7 +78,8 @@ hours AS (
          t0 + make_interval(0, 0, 0, 0, i) AS time_utc
   FROM samples LATERAL VIEW explode(sequence(0, last_hour)) AS i
 )
-SELECT x.session_id, x.sample_year, x.day_offset, sum(h.precipitation_mm) AS rain_mm
+SELECT x.session_id, x.sample_year, x.day_offset, sum(h.precipitation_mm) AS rain_mm,
+       avg(h.temp_c) AS temp_c, avg(h.solar_radiation_wm2) AS solar_radiation_wm2
 FROM hours x
 JOIN ${catalog}.silver.weather_hourly h USING (circuit_id, time_utc)
 GROUP BY x.session_id, x.sample_year, x.day_offset
