@@ -62,7 +62,7 @@ it did better than the simple rules. See [docs/backtest_report.md](docs/backtest
 - [x] **1. Data pipeline:** Jolpica (2001+), OpenF1 (2023+), FastF1 (2018–22), Open-Meteo history, 2027 calendar, circuit facts; bronze → silver; 33 DQ checks; idempotency proven
 - [x] **2. Features:** Bayesian driver traits (7, since 2001), car profiles incl. telemetry corner speeds, tyre models, safety-car / incident rates, pace trends; 36 known-fact and quality checks
 - [x] **3. Simulator:** qualifying model, vectorised lap-by-lap race sim (strategies, safety cars, overtaking calibrated per circuit), season and championship odds, joint car / driver / track model, after-practice update, leak-free backtests tuned on 2025 and tested on 2026
-- [ ] **4. MVP launch:** Streamlit app
+- [x] **4. MVP launch:** Streamlit app on Streamlit Community Cloud, daily forecast workflow publishing to the `data` branch
 - [ ] **5. Weather pipeline:** staged weather, track-temp calibration, daily refresh, prediction versioning
 - [ ] **6. Constructors + news:** development carry-over, LLM news signals, news backtest
 - [ ] **7. Rules lab:** physics lap simulator, regulation sliders, 2021→2022 backtest
