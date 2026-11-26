@@ -1,0 +1,1602 @@
+[
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "brier_podium",
+  "value": 0.6325,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "brier_win",
+  "value": 0.8315,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "log_loss_win",
+  "value": 1.8799,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "podium_hits",
+  "value": 0.4603,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "points_hits",
+  "value": 0.7619,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.6373,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "brier_podium",
+  "value": 0.5636,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "brier_win",
+  "value": 0.7569,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "log_loss_win",
+  "value": 1.5753,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "podium_hits",
+  "value": 0.5397,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "points_hits",
+  "value": 0.7333,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.6735,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "winner_hit",
+  "value": 0.1905,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "brier_podium",
+  "value": 0.6189,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "brier_win",
+  "value": 0.8116,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "log_loss_win",
+  "value": 2.2762,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "podium_hits",
+  "value": 0.5238,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "points_hits",
+  "value": 0.6762,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "spearman",
+  "value": 0.4823,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "brier_podium",
+  "value": 0.6325,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "brier_win",
+  "value": 0.8315,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "log_loss_win",
+  "value": 1.8799,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "podium_hits",
+  "value": 0.4603,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "points_hits",
+  "value": 0.7619,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.6373,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "brier_podium",
+  "value": 0.4877,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "brier_win",
+  "value": 0.4932,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "log_loss_win",
+  "value": 1.2661,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "podium_hits",
+  "value": 0.6032,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "points_hits",
+  "value": 0.7476,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "spearman",
+  "value": 0.6346,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "winner_hit",
+  "value": 0.7143,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "brier_podium",
+  "value": 0.4732,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "brier_win",
+  "value": 0.4968,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "log_loss_win",
+  "value": 1.103,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "podium_hits",
+  "value": 0.6032,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "points_hits",
+  "value": 0.7476,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.6857,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "winner_hit",
+  "value": 0.7143,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "brier_podium",
+  "value": 0.6189,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "brier_win",
+  "value": 0.8116,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "log_loss_win",
+  "value": 2.2762,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "podium_hits",
+  "value": 0.5238,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "points_hits",
+  "value": 0.6762,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "spearman",
+  "value": 0.4823,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "brier_podium",
+  "value": 0.6325,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "brier_win",
+  "value": 0.8315,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "log_loss_win",
+  "value": 1.8799,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "podium_hits",
+  "value": 0.4603,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "points_hits",
+  "value": 0.7619,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.6373,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "brier_podium",
+  "value": 0.571,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "brier_win",
+  "value": 0.7714,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "log_loss_win",
+  "value": 1.6465,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "podium_hits",
+  "value": 0.5397,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "points_hits",
+  "value": 0.7286,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.6566,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "winner_hit",
+  "value": 0.2381,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "brier_podium",
+  "value": 0.6189,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "brier_win",
+  "value": 0.8116,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "log_loss_win",
+  "value": 2.2762,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "podium_hits",
+  "value": 0.5238,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "points_hits",
+  "value": 0.6762,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "spearman",
+  "value": 0.4823,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "brier_pole",
+  "value": 0.8558,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "log_loss_pole",
+  "value": 2.0445,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "pole_hit",
+  "value": 0.2857,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.8047,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "top3_hits",
+  "value": 0.5079,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "brier_pole",
+  "value": 0.8328,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "log_loss_pole",
+  "value": 2.0466,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "pole_hit",
+  "value": 0.2381,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.835,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "top3_hits",
+  "value": 0.4603,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "brier_pole",
+  "value": 0.8938,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "log_loss_pole",
+  "value": 2.4628,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "pole_hit",
+  "value": 0.2857,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "spearman",
+  "value": 0.7456,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "top3_hits",
+  "value": 0.3651,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "brier_pole",
+  "value": 0.8558,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "log_loss_pole",
+  "value": 2.0445,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "pole_hit",
+  "value": 0.2857,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.8047,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "top3_hits",
+  "value": 0.5079,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "brier_pole",
+  "value": 0.8139,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "log_loss_pole",
+  "value": 1.927,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "pole_hit",
+  "value": 0.2381,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.8692,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "top3_hits",
+  "value": 0.5238,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "brier_pole",
+  "value": 0.8938,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "log_loss_pole",
+  "value": 2.4628,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "pole_hit",
+  "value": 0.2857,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "spearman",
+  "value": 0.7456,
+  "n_events": 21
+ },
+ {
+  "season": 2026,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "top3_hits",
+  "value": 0.3651,
+  "n_events": 21
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "brier_podium",
+  "value": 0.5217,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "brier_win",
+  "value": 0.9044,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "log_loss_win",
+  "value": 1.9877,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "podium_hits",
+  "value": 0.6667,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "points_hits",
+  "value": 0.6958,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.5342,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "championship",
+  "metric": "winner_hit",
+  "value": 0.2083,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "brier_podium",
+  "value": 0.5281,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "brier_win",
+  "value": 0.7695,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "log_loss_win",
+  "value": 1.7256,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "podium_hits",
+  "value": 0.5972,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "points_hits",
+  "value": 0.7417,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.5978,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "model",
+  "metric": "winner_hit",
+  "value": 0.375,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "brier_podium",
+  "value": 0.5927,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "brier_win",
+  "value": 0.7846,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "log_loss_win",
+  "value": 1.8273,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "podium_hits",
+  "value": 0.5556,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "points_hits",
+  "value": 0.65,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "spearman",
+  "value": 0.4364,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_practice",
+  "method": "previous_race",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "brier_podium",
+  "value": 0.5217,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "brier_win",
+  "value": 0.9044,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "log_loss_win",
+  "value": 1.9877,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "podium_hits",
+  "value": 0.6667,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "points_hits",
+  "value": 0.6958,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.5342,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "championship",
+  "metric": "winner_hit",
+  "value": 0.2083,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "brier_podium",
+  "value": 0.3878,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "brier_win",
+  "value": 0.5407,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "log_loss_win",
+  "value": 1.1157,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "podium_hits",
+  "value": 0.75,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "points_hits",
+  "value": 0.7792,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "spearman",
+  "value": 0.6511,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "grid",
+  "metric": "winner_hit",
+  "value": 0.6667,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "brier_podium",
+  "value": 0.3859,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "brier_win",
+  "value": 0.5471,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "log_loss_win",
+  "value": 1.106,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "podium_hits",
+  "value": 0.75,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "points_hits",
+  "value": 0.7792,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.6395,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "model",
+  "metric": "winner_hit",
+  "value": 0.6667,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "brier_podium",
+  "value": 0.5927,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "brier_win",
+  "value": 0.7846,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "log_loss_win",
+  "value": 1.8273,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "podium_hits",
+  "value": 0.5556,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "points_hits",
+  "value": 0.65,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "spearman",
+  "value": 0.4364,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "post_quali",
+  "method": "previous_race",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "brier_podium",
+  "value": 0.5217,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "brier_win",
+  "value": 0.9044,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "log_loss_win",
+  "value": 1.9877,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "podium_hits",
+  "value": 0.6667,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "points_hits",
+  "value": 0.6958,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.5342,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "championship",
+  "metric": "winner_hit",
+  "value": 0.2083,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "brier_podium",
+  "value": 0.5385,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "brier_win",
+  "value": 0.798,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "log_loss_win",
+  "value": 1.8071,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "podium_hits",
+  "value": 0.6111,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "points_hits",
+  "value": 0.7042,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.5726,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "model",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "brier_podium",
+  "value": 0.5927,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "brier_win",
+  "value": 0.7846,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "log_loss_win",
+  "value": 1.8273,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "podium_hits",
+  "value": 0.5556,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "points_hits",
+  "value": 0.65,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "spearman",
+  "value": 0.4364,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "pre_weekend",
+  "method": "previous_race",
+  "metric": "winner_hit",
+  "value": 0.3333,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "brier_pole",
+  "value": 0.9038,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "log_loss_pole",
+  "value": 2.3106,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "pole_hit",
+  "value": 0.2083,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.5922,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "championship",
+  "metric": "top3_hits",
+  "value": 0.6944,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "brier_pole",
+  "value": 0.826,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "log_loss_pole",
+  "value": 1.8936,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "pole_hit",
+  "value": 0.2083,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.6776,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "model",
+  "metric": "top3_hits",
+  "value": 0.6389,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "brier_pole",
+  "value": 0.8516,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "log_loss_pole",
+  "value": 1.9932,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "pole_hit",
+  "value": 0.2083,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "spearman",
+  "value": 0.6027,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying",
+  "method": "previous_quali",
+  "metric": "top3_hits",
+  "value": 0.5833,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "brier_pole",
+  "value": 0.9038,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "log_loss_pole",
+  "value": 2.3106,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "pole_hit",
+  "value": 0.2083,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "spearman",
+  "value": 0.5919,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "championship",
+  "metric": "top3_hits",
+  "value": 0.6944,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "brier_pole",
+  "value": 0.8091,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "log_loss_pole",
+  "value": 1.8505,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "pole_hit",
+  "value": 0.25,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "spearman",
+  "value": 0.6991,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "model",
+  "metric": "top3_hits",
+  "value": 0.6667,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "brier_pole",
+  "value": 0.8516,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "log_loss_pole",
+  "value": 1.9932,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "pole_hit",
+  "value": 0.2083,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "spearman",
+  "value": 0.6037,
+  "n_events": 24
+ },
+ {
+  "season": 2025,
+  "stage": "qualifying_post_practice",
+  "method": "previous_quali",
+  "metric": "top3_hits",
+  "value": 0.5833,
+  "n_events": 24
+ }
+]

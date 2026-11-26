@@ -1,0 +1,710 @@
+{
+ "event": {
+  "season": 2026,
+  "round": 22,
+  "event_name": "Qatar Grand Prix",
+  "circuit_id": "losail",
+  "race_date": "2026-11-29",
+  "race_start_utc": "2026-11-29T16:00:00.000Z",
+  "is_sprint": false,
+  "circuit_name": "Lusail International Circuit",
+  "country": "Qatar"
+ },
+ "speed_profile": "high",
+ "laps": 57,
+ "stages": [
+  {
+   "stage": "pre_weekend",
+   "label": "Before the weekend"
+  }
+ ],
+ "latest_stage": "pre_weekend",
+ "forecasts": {
+  "pre_weekend": [
+   {
+    "driver_id": "max_verstappen",
+    "code": "VER",
+    "full_name": "Max Verstappen",
+    "constructor_id": "red_bull",
+    "team_name": "Red Bull",
+    "team_color": "#4781D7",
+    "p_pole": 0.1873,
+    "p_top3_grid": 0.4457,
+    "expected_grid": 5.143,
+    "p_win": 0.2675,
+    "p_podium": 0.5433,
+    "p_points": 0.9059,
+    "p_dnf": 0.0857,
+    "expected_position": 3.394,
+    "expected_points": 14.4041
+   },
+   {
+    "driver_id": "leclerc",
+    "code": "LEC",
+    "full_name": "Charles Leclerc",
+    "constructor_id": "ferrari",
+    "team_name": "Ferrari",
+    "team_color": "#ED1131",
+    "p_pole": 0.0536,
+    "p_top3_grid": 0.1938,
+    "expected_grid": 5.4712,
+    "p_win": 0.1964,
+    "p_podium": 0.4724,
+    "p_points": 0.8993,
+    "p_dnf": 0.086,
+    "expected_position": 3.8685,
+    "expected_points": 13.0665
+   },
+   {
+    "driver_id": "antonelli",
+    "code": "ANT",
+    "full_name": "Andrea Kimi Antonelli",
+    "constructor_id": "mercedes",
+    "team_name": "Mercedes",
+    "team_color": "#00D7B6",
+    "p_pole": 0.2897,
+    "p_top3_grid": 0.6338,
+    "expected_grid": 4.6565,
+    "p_win": 0.1955,
+    "p_podium": 0.486,
+    "p_points": 0.8958,
+    "p_dnf": 0.0914,
+    "expected_position": 3.7984,
+    "expected_points": 13.1427
+   },
+   {
+    "driver_id": "russell",
+    "code": "RUS",
+    "full_name": "George Russell",
+    "constructor_id": "mercedes",
+    "team_name": "Mercedes",
+    "team_color": "#00D7B6",
+    "p_pole": 0.1575,
+    "p_top3_grid": 0.3996,
+    "expected_grid": 4.921,
+    "p_win": 0.0904,
+    "p_podium": 0.356,
+    "p_points": 0.8805,
+    "p_dnf": 0.0934,
+    "expected_position": 4.6553,
+    "expected_points": 10.8564
+   },
+   {
+    "driver_id": "norris",
+    "code": "NOR",
+    "full_name": "Lando Norris",
+    "constructor_id": "mclaren",
+    "team_name": "McLaren",
+    "team_color": "#F47600",
+    "p_pole": 0.0643,
+    "p_top3_grid": 0.2669,
+    "expected_grid": 7.023,
+    "p_win": 0.0822,
+    "p_podium": 0.2821,
+    "p_points": 0.857,
+    "p_dnf": 0.104,
+    "expected_position": 5.2013,
+    "expected_points": 9.6595
+   },
+   {
+    "driver_id": "piastri",
+    "code": "PIA",
+    "full_name": "Oscar Piastri",
+    "constructor_id": "mclaren",
+    "team_name": "McLaren",
+    "team_color": "#F47600",
+    "p_pole": 0.055,
+    "p_top3_grid": 0.1733,
+    "expected_grid": 7.2811,
+    "p_win": 0.0694,
+    "p_podium": 0.2497,
+    "p_points": 0.8453,
+    "p_dnf": 0.0976,
+    "expected_position": 5.5582,
+    "expected_points": 9.0445
+   },
+   {
+    "driver_id": "hamilton",
+    "code": "HAM",
+    "full_name": "Lewis Hamilton",
+    "constructor_id": "ferrari",
+    "team_name": "Ferrari",
+    "team_color": "#ED1131",
+    "p_pole": 0.0678,
+    "p_top3_grid": 0.2356,
+    "expected_grid": 5.4594,
+    "p_win": 0.0471,
+    "p_podium": 0.279,
+    "p_points": 0.8745,
+    "p_dnf": 0.0778,
+    "expected_position": 5.351,
+    "expected_points": 9.4936
+   },
+   {
+    "driver_id": "hadjar",
+    "code": "HAD",
+    "full_name": "Isack Hadjar",
+    "constructor_id": "red_bull",
+    "team_name": "Red Bull",
+    "team_color": "#4781D7",
+    "p_pole": 0.0407,
+    "p_top3_grid": 0.2014,
+    "expected_grid": 7.1823,
+    "p_win": 0.0399,
+    "p_podium": 0.2456,
+    "p_points": 0.8589,
+    "p_dnf": 0.0945,
+    "expected_position": 5.5291,
+    "expected_points": 8.9258
+   },
+   {
+    "driver_id": "gasly",
+    "code": "GAS",
+    "full_name": "Pierre Gasly",
+    "constructor_id": "alpine",
+    "team_name": "Alpine F1 Team",
+    "team_color": "#00A1E8",
+    "p_pole": 0.0185,
+    "p_top3_grid": 0.0807,
+    "expected_grid": 8.7745,
+    "p_win": 0.0038,
+    "p_podium": 0.0269,
+    "p_points": 0.5623,
+    "p_dnf": 0.095,
+    "expected_position": 9.5856,
+    "expected_points": 2.8291
+   },
+   {
+    "driver_id": "lawson",
+    "code": "LAW",
+    "full_name": "Liam Lawson",
+    "constructor_id": "rb",
+    "team_name": "RB F1 Team",
+    "team_color": "#6C98FF",
+    "p_pole": 0.0159,
+    "p_top3_grid": 0.0777,
+    "expected_grid": 9.5967,
+    "p_win": 0.0028,
+    "p_podium": 0.0167,
+    "p_points": 0.4933,
+    "p_dnf": 0.0741,
+    "expected_position": 10.3002,
+    "expected_points": 2.199
+   },
+   {
+    "driver_id": "arvid_lindblad",
+    "code": "LIN",
+    "full_name": "Arvid Lindblad",
+    "constructor_id": "rb",
+    "team_name": "RB F1 Team",
+    "team_color": "#6C98FF",
+    "p_pole": 0.021,
+    "p_top3_grid": 0.1161,
+    "expected_grid": 8.4217,
+    "p_win": 0.002,
+    "p_podium": 0.0152,
+    "p_points": 0.4903,
+    "p_dnf": 0.074,
+    "expected_position": 10.357,
+    "expected_points": 2.1106
+   },
+   {
+    "driver_id": "hulkenberg",
+    "code": "HUL",
+    "full_name": "Nico H\u00fclkenberg",
+    "constructor_id": "audi",
+    "team_name": "Audi",
+    "team_color": "#FF2D00",
+    "p_pole": 0.0021,
+    "p_top3_grid": 0.0294,
+    "expected_grid": 11.5789,
+    "p_win": 0.0014,
+    "p_podium": 0.0133,
+    "p_points": 0.3764,
+    "p_dnf": 0.1167,
+    "expected_position": 10.9865,
+    "expected_points": 1.6264
+   },
+   {
+    "driver_id": "colapinto",
+    "code": "COL",
+    "full_name": "Franco Colapinto",
+    "constructor_id": "alpine",
+    "team_name": "Alpine F1 Team",
+    "team_color": "#00A1E8",
+    "p_pole": 0.0051,
+    "p_top3_grid": 0.0533,
+    "expected_grid": 12.3794,
+    "p_win": 0.0007,
+    "p_podium": 0.0061,
+    "p_points": 0.3445,
+    "p_dnf": 0.0955,
+    "expected_position": 11.4053,
+    "expected_points": 1.301
+   },
+   {
+    "driver_id": "bearman",
+    "code": "BEA",
+    "full_name": "Oliver Bearman",
+    "constructor_id": "haas",
+    "team_name": "Haas F1 Team",
+    "team_color": "#9C9FA2",
+    "p_pole": 0.0031,
+    "p_top3_grid": 0.0167,
+    "expected_grid": 14.4346,
+    "p_win": 0.0005,
+    "p_podium": 0.0028,
+    "p_points": 0.2102,
+    "p_dnf": 0.123,
+    "expected_position": 12.5401,
+    "expected_points": 0.7215
+   },
+   {
+    "driver_id": "bortoleto",
+    "code": "BOR",
+    "full_name": "Gabriel Bortoleto",
+    "constructor_id": "audi",
+    "team_name": "Audi",
+    "team_color": "#FF2D00",
+    "p_pole": 0.0113,
+    "p_top3_grid": 0.0352,
+    "expected_grid": 11.5752,
+    "p_win": 0.0003,
+    "p_podium": 0.0037,
+    "p_points": 0.254,
+    "p_dnf": 0.1063,
+    "expected_position": 12.2149,
+    "expected_points": 0.9144
+   },
+   {
+    "driver_id": "rafael_camara",
+    "code": null,
+    "full_name": "Rafael Camara",
+    "constructor_id": "haas",
+    "team_name": "Haas F1 Team",
+    "team_color": "#9C9FA2",
+    "p_pole": 0.0,
+    "p_top3_grid": 0.0046,
+    "expected_grid": 16.9299,
+    "p_win": 0.0001,
+    "p_podium": 0.0008,
+    "p_points": 0.0952,
+    "p_dnf": 0.1265,
+    "expected_position": 14.0925,
+    "expected_points": 0.2888
+   },
+   {
+    "driver_id": "sainz",
+    "code": "SAI",
+    "full_name": "Carlos Sainz",
+    "constructor_id": "williams",
+    "team_name": "Williams",
+    "team_color": "#1868DB",
+    "p_pole": 0.0,
+    "p_top3_grid": 0.0044,
+    "expected_grid": 16.5313,
+    "p_win": 0.0,
+    "p_podium": 0.0002,
+    "p_points": 0.0936,
+    "p_dnf": 0.1637,
+    "expected_position": 13.9103,
+    "expected_points": 0.2561
+   },
+   {
+    "driver_id": "albon",
+    "code": "ALB",
+    "full_name": "Alexander Albon",
+    "constructor_id": "williams",
+    "team_name": "Williams",
+    "team_color": "#1868DB",
+    "p_pole": 0.0072,
+    "p_top3_grid": 0.0188,
+    "expected_grid": 18.1028,
+    "p_win": 0.0,
+    "p_podium": 0.0002,
+    "p_points": 0.0552,
+    "p_dnf": 0.1643,
+    "expected_position": 14.6241,
+    "expected_points": 0.1422
+   },
+   {
+    "driver_id": "perez",
+    "code": "PER",
+    "full_name": "Sergio P\u00e9rez",
+    "constructor_id": "cadillac",
+    "team_name": "Cadillac F1 Team",
+    "team_color": "#AAAAAD",
+    "p_pole": 0.0,
+    "p_top3_grid": 0.0044,
+    "expected_grid": 20.2151,
+    "p_win": 0.0,
+    "p_podium": 0.0,
+    "p_points": 0.004,
+    "p_dnf": 0.2078,
+    "expected_position": 17.1511,
+    "expected_points": 0.0089
+   },
+   {
+    "driver_id": "alonso",
+    "code": "ALO",
+    "full_name": "Fernando Alonso",
+    "constructor_id": "aston_martin",
+    "team_name": "Aston Martin",
+    "team_color": "#229971",
+    "p_pole": 0.0,
+    "p_top3_grid": 0.0117,
+    "expected_grid": 17.4046,
+    "p_win": 0.0,
+    "p_podium": 0.0,
+    "p_points": 0.0034,
+    "p_dnf": 0.2435,
+    "expected_position": 17.4722,
+    "expected_points": 0.0085
+   },
+   {
+    "driver_id": "stroll",
+    "code": "STR",
+    "full_name": "Lance Stroll",
+    "constructor_id": "aston_martin",
+    "team_name": "Aston Martin",
+    "team_color": "#229971",
+    "p_pole": 0.0,
+    "p_top3_grid": 0.009,
+    "expected_grid": 19.8354,
+    "p_win": 0.0,
+    "p_podium": 0.0,
+    "p_points": 0.0004,
+    "p_dnf": 0.2604,
+    "expected_position": 18.6781,
+    "expected_points": 0.0004
+   },
+   {
+    "driver_id": "bottas",
+    "code": "BOT",
+    "full_name": "Valtteri Bottas",
+    "constructor_id": "cadillac",
+    "team_name": "Cadillac F1 Team",
+    "team_color": "#AAAAAD",
+    "p_pole": 0.0,
+    "p_top3_grid": 0.009,
+    "expected_grid": 20.0824,
+    "p_win": 0.0,
+    "p_podium": 0.0,
+    "p_points": 0.0,
+    "p_dnf": 0.1954,
+    "expected_position": 18.8187,
+    "expected_points": 0.0
+   }
+  ]
+ },
+ "strategies": {
+  "hadjar": [
+   {
+    "strategy": "M-S",
+    "share": 0.284
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.268
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.182
+   }
+  ],
+  "lawson": [
+   {
+    "strategy": "M-S",
+    "share": 0.281
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.262
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.191
+   }
+  ],
+  "rafael_camara": [
+   {
+    "strategy": "M-S",
+    "share": 0.28
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.275
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.18
+   }
+  ],
+  "sainz": [
+   {
+    "strategy": "S-M",
+    "share": 0.28
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.273
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.182
+   }
+  ],
+  "bortoleto": [
+   {
+    "strategy": "M-S",
+    "share": 0.28
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.277
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.181
+   }
+  ],
+  "leclerc": [
+   {
+    "strategy": "M-S",
+    "share": 0.279
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.278
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.184
+   }
+  ],
+  "colapinto": [
+   {
+    "strategy": "S-M",
+    "share": 0.278
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.266
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.185
+   }
+  ],
+  "albon": [
+   {
+    "strategy": "S-M",
+    "share": 0.277
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.274
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.182
+   }
+  ],
+  "stroll": [
+   {
+    "strategy": "M-S",
+    "share": 0.276
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.276
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.181
+   }
+  ],
+  "max_verstappen": [
+   {
+    "strategy": "S-M",
+    "share": 0.276
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.267
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.186
+   }
+  ],
+  "piastri": [
+   {
+    "strategy": "S-M",
+    "share": 0.275
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.271
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.186
+   }
+  ],
+  "arvid_lindblad": [
+   {
+    "strategy": "M-S",
+    "share": 0.275
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.269
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.188
+   }
+  ],
+  "bearman": [
+   {
+    "strategy": "M-S",
+    "share": 0.275
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.266
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.19
+   }
+  ],
+  "bottas": [
+   {
+    "strategy": "M-S",
+    "share": 0.274
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.272
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.183
+   }
+  ],
+  "norris": [
+   {
+    "strategy": "S-M",
+    "share": 0.274
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.267
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.187
+   }
+  ],
+  "hulkenberg": [
+   {
+    "strategy": "M-S",
+    "share": 0.274
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.271
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.186
+   }
+  ],
+  "gasly": [
+   {
+    "strategy": "S-M",
+    "share": 0.274
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.271
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.186
+   }
+  ],
+  "alonso": [
+   {
+    "strategy": "S-M",
+    "share": 0.274
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.273
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.183
+   }
+  ],
+  "russell": [
+   {
+    "strategy": "S-M",
+    "share": 0.273
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.269
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.192
+   }
+  ],
+  "antonelli": [
+   {
+    "strategy": "M-S",
+    "share": 0.272
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.269
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.19
+   }
+  ],
+  "hamilton": [
+   {
+    "strategy": "M-S",
+    "share": 0.272
+   },
+   {
+    "strategy": "S-M",
+    "share": 0.267
+   },
+   {
+    "strategy": "S-H",
+    "share": 0.187
+   }
+  ],
+  "perez": [
+   {
+    "strategy": "S-M",
+    "share": 0.271
+   },
+   {
+    "strategy": "M-S",
+    "share": 0.27
+   },
+   {
+    "strategy": "H-S",
+    "share": 0.186
+   }
+  ]
+ }
+}
