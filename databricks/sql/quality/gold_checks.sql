@@ -27,6 +27,19 @@ SELECT 'gold unique: driver_practice_pace(season, round, session, driver)', 'err
        array_join(slice(collect_list(concat(season, ':', round, ':', session_code, ':', driver_id)), 1, 5), ', ')
 FROM (SELECT season, round, session_code, driver_id FROM ${catalog}.gold.driver_practice_pace GROUP BY ALL HAVING count(*) > 1);
 
+SELECT 'gold unique: session_rain(session)', 'error', count(*), array_join(slice(collect_list(session_id), 1, 5), ', ')
+FROM (SELECT session_id FROM ${catalog}.gold.session_rain GROUP BY ALL HAVING count(*) > 1);
+
+SELECT 'gold unique: session_rain_forecast(session, source, issue, lead)', 'error', count(*),
+       array_join(slice(collect_list(session_id), 1, 5), ', ')
+FROM (SELECT session_id, source, issued_utc, lead_days FROM ${catalog}.gold.session_rain_forecast GROUP BY ALL HAVING count(*) > 1);
+
+SELECT 'gold rows: climate samples for every 2018+ session (>= 100 each)', 'warn', count(*),
+       array_join(slice(collect_list(session_id), 1, 5), ', ')
+FROM (SELECT s.session_id FROM ${catalog}.gold.session_rain s
+      LEFT JOIN ${catalog}.gold.session_rain_climate c USING (session_id)
+      WHERE s.season >= 2018 GROUP BY ALL HAVING count(c.session_id) < 100);
+
 SELECT 'gold unique: car_profiles(team, season, round)', 'error', count(*), array_join(slice(collect_list(constructor_id), 1, 5), ', ')
 FROM (SELECT constructor_id, season, as_of_round FROM ${catalog}.gold.car_profiles GROUP BY ALL HAVING count(*) > 1);
 
